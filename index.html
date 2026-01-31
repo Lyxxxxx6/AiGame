@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>狂飙：无尽逃脱 - 终极制作人版</title>
+    <title>狂飙：延迟爆破 - 终极物理版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
 
@@ -224,7 +224,7 @@
         hitboxScale: 0.4, showHitboxes: false,
         roadWidthScale: 1.0,
         buildDensity: 0.5,
-        carDensity: 0.02, // 核心需求 4：默认密度修改为 2%
+        carDensity: 0.02,
         curveMult: 1.0,
         curveFreq: 0.3
     };
@@ -272,7 +272,6 @@
     }
 
     function bindUI() {
-        // 核心需求 5：恢复设置项绑定
         document.getElementById('set-hitbox-debug').onchange = function() { SETTINGS.showHitboxes = this.checked; };
         document.getElementById('set-hitbox-scale').oninput = function() { SETTINGS.hitboxScale = this.value / 100; document.getElementById('val-hitbox').innerText = SETTINGS.hitboxScale.toFixed(2); };
         document.getElementById('set-traf').oninput = function() { SETTINGS.carDensity = this.value / 100; document.getElementById('val-traf').innerText = this.value + "%"; };
@@ -324,7 +323,7 @@
         if (!game.audio.ctx) initAudio();
         stopMenuMusic();
 
-        game.mode = mode; // 核心需求 2：设置游戏模式
+        game.mode = mode;
         game.segments = []; game.segmentOffsetIndex = 0;
         game.cars = []; game.particles = []; game.bullets = []; game.shockwaves = [];
         game.player = { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0, rushScoreAccumulator: 0 };
@@ -339,7 +338,6 @@
         document.getElementById('hud').style.display = 'block';
         document.getElementById('rush-score-container').style.display = 'none';
 
-        // 更新HUD标签
         document.getElementById('score-label').innerText = game.mode === 'endless' ? "无尽分数" : "总积分";
 
         game.state = STATE.COUNTDOWN;
@@ -370,7 +368,6 @@
             if (TrackGen.sectionLeft <= 0) {
                 const r = Math.random();
                 TrackGen.startY = TrackGen.y;
-                // 核心需求 5：使用 SETTINGS 中的参数生成赛道
                 const remainingBudget = 1.0 - SETTINGS.curveFreq;
                 const straightThreshold = remainingBudget * 0.6;
                 const curveThreshold = straightThreshold + SETTINGS.curveFreq;
@@ -524,17 +521,22 @@
         }
         updateBullets(dt);
 
+        // --- 核心逻辑 1：被撞飞后的延迟爆炸 ---
         game.cars.forEach(car => {
             if (car.active && car.hit) {
                 car.x += car.vx * dt;
                 car.flyY += car.vy * dt;
-                car.vy -= 80 * dt;
-                car.rot += 5 * dt;
+                car.vy -= 80 * dt; // 重力
+                car.rot += 5 * dt; // 旋转
+                car.z += car.speed * dt; // 保持向前
+                car.hitTime += dt; // 计时器
 
-                if (car.flyY > 800) {
+                // 核心：0.5秒后在当前位置爆炸
+                if (car.hitTime >= 0.5) {
                     car.active = false;
                     triggerBigExplosion(car.x, car.z, car.flyY, '#fa0');
                 }
+
                 if(car.flyY < 0) car.active = false;
             } else if (car.active) {
                 car.z += car.speed * dt;
@@ -566,7 +568,7 @@
             }
         });
 
-        // --- 核心需求 2 & 3：模式逻辑 ---
+        // --- 模式逻辑 ---
         if (isRush) {
             // 核心需求 3：冲刺时间减半 (25消耗率 = 约4秒)
             p.rage -= dt * 25;
@@ -639,8 +641,12 @@
 
     function knockbackObject(target) {
         target.hit = true;
-        target.vy = 40 + Math.random() * 20;
-        target.vx = (Math.random() > 0.5 ? 1 : -1) * (10 + Math.random() * 20);
+        target.hitTime = 0; // 初始化计时器
+        // 核心逻辑 1：让车向前飞 (Z轴速度比玩家快一点)
+        target.speed = game.player.speed + 1000;
+
+        target.vy = 50 + Math.random() * 20; // 向上
+        target.vx = (Math.random() > 0.5 ? 1 : -1) * (10 + Math.random() * 20); // 向侧面
         target.flyY = 0;
         target.rot = 0;
     }
