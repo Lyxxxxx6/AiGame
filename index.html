@@ -774,7 +774,7 @@
             game.player.score += 3000;
 
             // 修改点2：射击车辆获取的怒气值减半 (5 -> 2.5)
-            game.player.rage += 2.5;
+            game.player.rage += 5;
 
             game.player.kills++;
             showMsg("目标摧毁", "+3000");
@@ -806,7 +806,7 @@
                 game.renderer.flash = 0.8;
 
                 // 修改点1：撞击车辆获取的怒气值减半 (20 -> 10)
-                game.player.rage += 10;
+                game.player.rage += 12;
 
                 game.player.score += 5000;
                 game.player.kills++;
