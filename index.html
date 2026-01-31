@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>狂飙之油门焊死：战斗进化版</title>
+    <title>狂飙：野蛮冲撞版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
 
@@ -129,7 +129,6 @@
                 </div>
 
                 <h3 style="color: #0ff; border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;">世界生成</h3>
-                <!-- 需求1：默认频率改为30% -->
                 <div class="setting-item">
                     <label class="setting-label">弯道频率 (Pacing) <span id="val-curve-freq" style="color:#fa0">30%</span></label>
                     <input type="range" id="set-curve-freq" min="10" max="90" value="30">
@@ -171,8 +170,8 @@
     const CONFIG = {
         segL: 200, laneW: 2400, roadW: 2200, camH: 4500, baseCamD: 0.84, drawDist: 500,
         accel: 120, maxSpeed: 14000, rushSpeed: 120000,
-        bulletSpeed: 50000, // 子弹速度
-        winScore: 99999,    // 胜利分数
+        bulletSpeed: 50000,
+        winScore: 99999,
         centrifugal: 0.35, steerSens: 3.5,
         colors: { sky: '#050510', roadDark: '#101015', roadLight: '#181820', grassDark: '#020205', grassLight: '#040408' }
     };
@@ -182,7 +181,7 @@
         hitboxScale: 0.4, showHitboxes: false,
         roadWidthScale: 1.0, buildDensity: 0.5,
         carDensity: 0.01, curveMult: 1.0,
-        curveFreq: 0.3 // 默认30%
+        curveFreq: 0.3
     };
 
     const STATE = { MENU: 0, COUNTDOWN: 1, PLAY: 2, RUSH: 3, GAMEOVER: 4, VICTORY: 5 };
@@ -191,7 +190,7 @@
         state: STATE.MENU,
         time: 0, dt: 0,
         segments: [], segmentOffsetIndex: 0,
-        cars: [], particles: [], bullets: [], // 子弹数组
+        cars: [], particles: [], bullets: [],
         player: { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0 },
         keys: { left: false, right: false, up: false, space: false },
         cam: { shake: 0, y: 0, fovOffset: 0, skyOffset: 0 },
@@ -248,6 +247,7 @@
         game.player = { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0 };
         game.cam = { shake: 0, y: 0, fovOffset: 0, skyOffset: 0 };
         game.victoryTimer = 0;
+        game.time = 0; // 重置游戏时间
         TrackGen = { sectionLeft: 0, type: 'straight', y: 0, targetY: 0, startY: 0, targetCurve: 0, curve: 0 };
         extendTrack(CONFIG.drawDist + 200);
         document.getElementById('menu-layer').style.display = 'none';
@@ -316,7 +316,7 @@
             if (Math.random() < SETTINGS.buildDensity * 0.05) {
                 const keys = Object.keys(OBS_STYLES);
                 const styleKey = keys[Math.floor(Math.random() * keys.length)];
-                sprites.push({ type: 'obs', style: styleKey, x: (Math.random()*2 - 1) * 0.8, size: 0.8 + Math.random()*0.4 });
+                sprites.push({ type: 'obs', style: styleKey, x: (Math.random()*2 - 1) * 0.8, size: 0.8 + Math.random()*0.4, active: true });
             }
             if (Math.random() < SETTINGS.carDensity) {
                 const keys = Object.keys(CAR_STYLES);
@@ -350,7 +350,7 @@
             update(dt);
             render();
         } else if (game.state === STATE.GAMEOVER || game.state === STATE.VICTORY) {
-            render(); // 保持最后一帧渲染
+            render();
         }
         requestAnimationFrame(gameLoop);
     }
@@ -366,20 +366,14 @@
         const maxS = isRush ? CONFIG.rushSpeed : CONFIG.maxSpeed;
         const accelMult = game.keys.up ? 1.5 : 1.0;
 
-        // 速度控制
-        if (isRush) {
-            p.speed += CONFIG.accel * 5;
-        } else {
-            p.speed += CONFIG.accel * accelMult;
-        }
+        if (isRush) { p.speed += CONFIG.accel * 5; }
+        else { p.speed += CONFIG.accel * accelMult; }
 
         if (p.speed > maxS) p.speed = maxS;
         if (!game.keys.up && !isRush && p.speed > 0) p.speed -= CONFIG.accel * 0.5;
 
-        // 移动
         p.z += p.speed * dt;
 
-        // 生成新跑道
         const currentIdx = Math.floor(p.z / CONFIG.segL);
         if ((currentIdx - game.segmentOffsetIndex) > game.segments.length - 300) extendTrack(200);
         if ((currentIdx - game.segmentOffsetIndex) > 200) {
@@ -393,7 +387,6 @@
         const trackY = currentSeg.p1.world.y + (currentSeg.p2.world.y - currentSeg.p1.world.y) * pct;
         game.cam.y = trackY + CONFIG.camH;
 
-        // 转向
         let speedRatio = (p.speed / CONFIG.maxSpeed);
         let steerPower = dt * (speedRatio + 0.5) * CONFIG.steerSens;
         if (isRush) steerPower *= 1.5;
@@ -401,11 +394,9 @@
         if (game.keys.left) p.x -= steerPower;
         if (game.keys.right) p.x += steerPower;
 
-        // 离心力
         p.x -= (currentSeg.curve * speedRatio * CONFIG.centrifugal) * dt;
         game.cam.skyOffset -= (currentSeg.curve * speedRatio * dt * 0.5);
 
-        // 边界
         const currentRoadLimit = (CONFIG.roadW / CONFIG.laneW) * SETTINGS.roadWidthScale - 0.1;
         if (p.x < -currentRoadLimit) { p.x = -currentRoadLimit; if(p.speed>8000) p.speed-=200; }
         if (p.x > currentRoadLimit) { p.x = currentRoadLimit; if(p.speed>8000) p.speed-=200; }
@@ -414,10 +405,35 @@
         game.shootCooldown -= dt;
         if (game.keys.space && game.shootCooldown <= 0 && game.state === STATE.PLAY) {
             spawnBullet(p.x, p.z, p.speed);
-            game.shootCooldown = 0.2; // 0.2秒射速
-            playTone(1200, 0.05, 'sawtooth'); // 射击音效
+            game.shootCooldown = 0.2;
+            playTone(1200, 0.05, 'sawtooth');
         }
         updateBullets(dt);
+
+        // --- 物理更新 (处理被撞飞的物体) ---
+        game.cars.forEach(car => {
+            if (car.hit) {
+                // 撞飞物理
+                car.x += car.vx * dt;
+                car.flyY += car.vy * dt;
+                car.vy -= 80 * dt; // 重力
+                car.rot += 5 * dt; // 旋转
+                if(car.flyY < 0) car.active = false; // 落地消失
+            } else {
+                car.z += car.speed * dt;
+                if (car.z < p.z - 2000) car.z = p.z + CONFIG.drawDist * CONFIG.segL * (0.8 + Math.random()*0.4);
+            }
+        });
+
+        // 障碍物物理更新
+        currentSeg.sprites.forEach((s) => {
+            if (s.hit) {
+                s.x += s.vx * dt;
+                s.flyY += s.vy * dt;
+                s.vy -= 80 * dt;
+                s.rot += 5 * dt;
+            }
+        });
 
         // --- 碰撞检测 ---
         const baseHitWidth = 0.2;
@@ -425,42 +441,36 @@
 
         // 车辆碰撞
         game.cars.forEach(car => {
-            car.z += car.speed * dt;
-            if (car.z < p.z - 2000) car.z = p.z + CONFIG.drawDist * CONFIG.segL * (0.8 + Math.random()*0.4);
-            // 玩家撞车
-            if (car.active && Math.abs(car.z - p.z) < (350 * SETTINGS.hitboxScale) && Math.abs(car.x - p.x) < dynamicHitWidth) {
+            if (car.active && !car.hit && Math.abs(car.z - p.z) < (350 * SETTINGS.hitboxScale) && Math.abs(car.x - p.x) < dynamicHitWidth) {
                 handlePlayerCollision(car, 'car', currentSeg);
             }
         });
 
         // 障碍物碰撞
         currentSeg.sprites.forEach((s) => {
-            if (s.active !== false && Math.abs(p.x - s.x) < dynamicHitWidth) {
+            if (s.active && !s.hit && Math.abs(p.x - s.x) < dynamicHitWidth) {
                 handlePlayerCollision(s, 'obs', currentSeg);
             }
         });
 
         // --- 状态管理 ---
         if (isRush) {
-            // RUSH 模式下增加分数消耗怒气
             p.rage -= dt * 20;
-            p.score += 5000 * dt; // 冲刺时分数疯涨
-            // 胜利判定检测
+            p.score += 5000 * dt;
             if (p.score >= CONFIG.winScore) {
                 if (game.victoryTimer === 0) showMsg("目标达成!", "全速前进!");
                 game.victoryTimer += dt;
-                p.rage = 100; // 保持怒气
+                p.rage = 100;
                 if (game.victoryTimer > 3.0) triggerVictory();
             } else if (p.rage <= 0) {
                 exitRushMode();
             }
         } else {
-            // 普通模式
             p.rage = Math.max(0, p.rage - dt * 2);
             if (p.rage >= 100) enterRushMode();
 
-            // 失败判定：速度归零 (如果不是刚开始)
-            if (p.speed <= 100 && game.time > 2.0 && p.z > 500) {
+            // 失败判定：速度 < 20 (2000 units)，给予起步保护
+            if (p.speed < 2000 && game.time > 3.0) {
                 triggerGameOver();
             }
         }
@@ -468,7 +478,6 @@
         game.time += dt;
         if (game.cam.shake > 0) game.cam.shake = Math.max(0, game.cam.shake - dt * 100);
 
-        // 相机 FOV 动态
         const targetFov = CONFIG.baseCamD - (speedRatio * 0.3) - (game.keys.up ? 0.05 : 0);
         game.cam.fovOffset += (targetFov - game.cam.fovOffset) * dt * 2;
         updateAudio(dt);
@@ -476,15 +485,8 @@
         updateUI();
     }
 
-    // --- 射击与子弹系统 ---
     function spawnBullet(x, z, playerSpeed) {
-        game.bullets.push({
-            x: x,
-            z: z + 200, // 稍微在车前生成
-            speed: CONFIG.bulletSpeed + playerSpeed, // 相对速度
-            life: 1.5, // 存活时间
-            active: true
-        });
+        game.bullets.push({ x: x, z: z + 200, speed: CONFIG.bulletSpeed + playerSpeed, life: 1.5, active: true });
     }
 
     function updateBullets(dt) {
@@ -492,22 +494,18 @@
             let b = game.bullets[i];
             b.z += b.speed * dt;
             b.life -= dt;
-
-            // 子弹碰撞检测
             if (b.active) {
-                // 检查车辆
                 for (let c of game.cars) {
-                    if (c.active && Math.abs(c.z - b.z) < 400 && Math.abs(c.x - b.x) < 0.3) {
+                    if (c.active && !c.hit && Math.abs(c.z - b.z) < 400 && Math.abs(c.x - b.x) < 0.3) {
                         handleBulletHit(b, c, 'car');
                         break;
                     }
                 }
-                // 检查障碍物 (优化：只检查玩家附近的段)
                 if (b.active) {
                     let seg = findSegment(b.z);
                     if (seg && seg.sprites) {
                         for (let s of seg.sprites) {
-                            if (s.active !== false && Math.abs(s.x - b.x) < 0.3) {
+                            if (s.active && !s.hit && Math.abs(s.x - b.x) < 0.3) {
                                 handleBulletHit(b, s, 'obs');
                                 break;
                             }
@@ -515,22 +513,29 @@
                     }
                 }
             }
-
             if (b.life <= 0 || !b.active) game.bullets.splice(i, 1);
         }
     }
 
+    function knockbackObject(target) {
+        target.hit = true;
+        // 赋予向上的速度和随机的横向速度
+        target.vy = 40 + Math.random() * 20;
+        target.vx = (Math.random() > 0.5 ? 1 : -1) * (10 + Math.random() * 20);
+        target.flyY = 0; // 初始离地高度
+        target.rot = 0;  // 初始旋转
+    }
+
     function handleBulletHit(bullet, target, type) {
         bullet.active = false;
-        target.active = false;
-        if(type === 'car') target.z = -99999;
 
-        // 击中奖励
+        // 击中反馈：击飞
+        knockbackObject(target);
+
         game.player.rage += 10;
         game.player.score += 500;
         game.player.kills++;
 
-        // 视觉效果
         const seg = findSegment(bullet.z);
         const hitPos = screenPosFromTarget({x:target.x, z:bullet.z}, seg);
         spawnExplosion(hitPos.x, hitPos.y, 30, '#0ff');
@@ -541,13 +546,16 @@
 
     function handlePlayerCollision(target, type, segRef) {
         const isRush = game.state === STATE.RUSH;
-        game.cam.shake = isRush ? 15 : 40;
-        target.active = false;
-        if(type === 'car') target.z = -99999; else target.active=false;
+        game.cam.shake = isRush ? 20 : 50;
+
+        // 核心更新：撞飞效果
+        knockbackObject(target);
 
         const hitPos = screenPosFromTarget(target, segRef);
         spawnExplosion(hitPos.x, hitPos.y, 50, isRush ? '#0ff' : '#f00');
-        playExplosionSound(isRush ? 0.8 : 1.5);
+
+        // 核心更新：音效
+        playCrashSound();
 
         if (isRush) {
             game.player.score += 5000;
@@ -555,25 +563,29 @@
             showMsg("碾压", "+5000分");
         }
         else {
-            // 惩罚：大幅减速
-            game.player.speed *= 0.3; // 降至30%
-            if(game.player.speed < 1000) game.player.speed = 0; // 彻底逼停
-            showMsg("发生事故", "速度暴跌");
+            // 核心更新：速度降低减缓 (0.75x)
+            game.player.speed *= 0.75;
+
+            if (type === 'car') {
+                // 核心更新：野蛮冲撞 UI
+                showMsg("野蛮冲撞", "SAVAGE IMPACT");
+                game.player.rage += 15; // 撞车给怒气，鼓励进攻
+            } else {
+                showMsg("碰撞", "速度降低");
+            }
         }
     }
 
-    // --- 游戏流程控制 ---
     function triggerGameOver() {
         game.state = STATE.GAMEOVER;
         const screen = document.getElementById('end-screen');
         const title = document.getElementById('end-title');
         const msg = document.getElementById('end-msg');
-
-        title.innerText = "任务失败";
+        title.innerText = "引擎熄火";
         title.className = "end-title lose-text";
-        msg.innerText = "车辆损毁 | 最终得分: " + Math.floor(game.player.score);
+        msg.innerText = "速度过低 | 最终得分: " + Math.floor(game.player.score);
         screen.style.display = 'flex';
-        playTone(150, 1.0, 'sawtooth'); // 失败音效
+        playTone(100, 1.5, 'sawtooth');
     }
 
     function triggerVictory() {
@@ -581,12 +593,10 @@
         const screen = document.getElementById('end-screen');
         const title = document.getElementById('end-title');
         const msg = document.getElementById('end-msg');
-
         title.innerText = "传说";
         title.className = "end-title win-text";
         msg.innerText = "极速传说达成 | 最终得分: " + Math.floor(game.player.score);
         screen.style.display = 'flex';
-        // 胜利音效
         playTone(600, 0.2, 'sine'); setTimeout(()=>playTone(800, 0.4, 'sine'), 200);
     }
 
@@ -597,18 +607,16 @@
         showMsg("氮气满载", "空格射击 / 自动加速");
     }
     function exitRushMode() {
-        if (game.state === STATE.VICTORY) return; // 胜利后不退出
+        if (game.state === STATE.VICTORY) return;
         game.state = STATE.PLAY;
         game.player.rage = 0;
         document.getElementById('game-container').classList.remove('rush-active');
         document.getElementById('rage-container').classList.remove('full');
     }
 
-    // --- 视觉渲染 ---
     function render() {
         ctx.fillStyle = game.state === STATE.RUSH ? '#100' : CONFIG.colors.sky;
         ctx.fillRect(0,0,W,H);
-
         const bgOffset = (game.cam.skyOffset * W) % W;
         ctx.save(); ctx.fillStyle = '#FFF';
         for(let i=0; i<50; i++) {
@@ -630,7 +638,6 @@
 
         let x = 0; let dx = 0;
 
-        // 3D 投影循环
         for(let n=0; n<CONFIG.drawDist; n++) {
             const idx = baseIdx + n;
             if(idx >= game.segments.length || idx < 0) continue;
@@ -648,7 +655,6 @@
             maxY = segment.p1.screen.y;
         }
 
-        // 绘制物体
         for(let n=CONFIG.drawDist-1; n>0; n--) {
             const idx = baseIdx + n;
             if(idx >= game.segments.length || idx < 0) continue;
@@ -658,52 +664,50 @@
             segment.buildings.forEach(b => renderBuilding3D(segment, b, currentLaneW));
 
             game.cars.forEach(car => {
-                if(car.active && car.z >= segment.p1.world.z && car.z < segment.p2.world.z) {
-                    const pct = (car.z - segment.p1.world.z) / CONFIG.segL;
-                    renderCarModel(segment, car, currentLaneW, pct);
+                if(car.active) {
+                    if (car.z >= segment.p1.world.z && car.z < segment.p2.world.z) {
+                        const pct = (car.z - segment.p1.world.z) / CONFIG.segL;
+                        renderCarModel(segment, car, currentLaneW, pct);
+                    } else if (car.hit) {
+                        // 渲染被撞飞的车辆 (即便不在当前段)
+                        // 使用一个大概的 Z 位置进行渲染，确保看得到
+                        const pct = 0.5; // 近似
+                        if (car.z > game.player.z + 100 && car.z < game.player.z + CONFIG.drawDist * CONFIG.segL) {
+                            // 查找正确段来获取投影
+                            let s = findSegment(car.z);
+                            if(s) renderCarModel(s, car, currentLaneW, (car.z - s.p1.world.z)/CONFIG.segL);
+                        }
+                    }
                 }
             });
 
             segment.sprites.forEach(s => {
-                if(s.active !== false) renderObstacleModel(segment, s, currentLaneW, 0);
+                if(s.active) renderObstacleModel(segment, s, currentLaneW, 0);
             });
         }
 
-        renderBullets(baseIdx); // 绘制子弹
+        renderBullets(baseIdx);
         renderPlayer();
         renderParticles();
         ctx.restore();
     }
 
     function renderBullets(baseIdx) {
-        ctx.save();
-        ctx.strokeStyle = '#0ff';
-        ctx.lineWidth = 4;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#0ff';
-        ctx.globalCompositeOperation = 'lighter';
-
+        ctx.save(); ctx.strokeStyle = '#0ff'; ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff'; ctx.globalCompositeOperation = 'lighter';
         game.bullets.forEach(b => {
-            // 简单的子弹投影逻辑 (简化版，复用 findSegment 可能较慢，这里用简单的相对计算)
             const bSegIdx = Math.floor(b.z / CONFIG.segL) - game.segmentOffsetIndex;
-            // 只有在视野内的子弹才绘制
             if (bSegIdx >= 0 && bSegIdx < game.segments.length) {
                 const seg = game.segments[bSegIdx];
                 const offsetZ = b.z - game.player.z;
                 if(offsetZ > 10) {
                     const hitPos = screenPosFromTarget({x: b.x, z: b.z}, seg);
-                    // 绘制激光线条
-                    ctx.beginPath();
-                    ctx.moveTo(hitPos.x, hitPos.y);
-                    ctx.lineTo(hitPos.x, hitPos.y - 20 * (2000/offsetZ)); // 简单的透视长度
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(hitPos.x, hitPos.y); ctx.lineTo(hitPos.x, hitPos.y - 20 * (2000/offsetZ)); ctx.stroke();
                 }
             }
         });
         ctx.restore();
     }
 
-    // --- 辅助函数 (保持原有逻辑) ---
     function updateParticles(dt) { for(let i=game.particles.length-1; i>=0; i--) { let pt = game.particles[i]; pt.x += pt.vx; pt.y += pt.vy; pt.life -= dt; pt.vy += 5*dt; if(pt.life <= 0) game.particles.splice(i,1); } }
     function renderParticles() { game.particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); }); ctx.globalAlpha = 1; }
     function spawnExplosion(x,y,n,c) { for(let i=0;i<n;i++) { const a = Math.random()*6.28, s = Math.random()*15+5; game.particles.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:Math.random(),color:c,size:Math.random()*6+2}); } }
@@ -730,9 +734,6 @@
         const offsetZ = wz - game.player.z;
         const currentCamD = game.cam.fovOffset || CONFIG.baseCamD;
         const temp = { world:{ y: wy, z: wz }, camera:{}, screen:{} };
-        // 投影时需要包含当前的弯道偏移 x
-        // 为了简化，这里我们重新计算一下 x 偏移 (理想情况下应该缓存 segment 的 screenX)
-        // 这是一个近似值，用于特效
         project(temp, (target.x||0)* laneW, offsetZ, currentCamD);
         return { x: temp.screen.x, y: temp.screen.y };
     }
@@ -780,7 +781,19 @@
         const sx = p1.x + (p2.x - p1.x) * pct + (scale * car.x * laneW * W / 2); const sy = p1.y + (p2.y - p1.y) * pct;
         const style = CAR_STYLES[car.style] || CAR_STYLES['sedan']; const w = style.w * scale * W / 2; const h = style.h * scale * H / 2;
         if (w < 1 || h < 1) return;
-        ctx.save(); ctx.translate(sx, sy);
+
+        ctx.save();
+
+        // --- 核心更新：飞行/翻滚效果 ---
+        if (car.hit) {
+            const flyScale = 1 + (car.flyY || 0) / 1000;
+            ctx.translate(sx, sy - (car.flyY || 0) * scale * 5); // 飞行高度
+            ctx.rotate(car.rot || 0); // 旋转
+            ctx.scale(flyScale, flyScale);
+        } else {
+            ctx.translate(sx, sy);
+        }
+
         ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-w/2 - w*0.1, 0, w*1.2, h*0.15);
         const parallax = (sx - W/2) / (W/2); const depth = w * 0.4;
         ctx.fillStyle = '#111';
@@ -790,17 +803,26 @@
         ctx.shadowBlur = 10 * scale * 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00';
         if (style.lights === 'v-side') { ctx.fillRect(-w/2 + 2, -h + 10, w*0.1, h*0.8); ctx.fillRect(w/2 - w*0.1 - 2, -h + 10, w*0.1, h*0.8); } else if (style.lights === 'quad') { const r = h/6; ctx.beginPath(); ctx.arc(-w/3, -h/3, r, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(w/3, -h/3, r, 0, Math.PI*2); ctx.fill(); } else { ctx.fillRect(-w/2 + 5, -h/2, w-10, h/5); }
         ctx.shadowBlur = 0;
-        if (SETTINGS.showHitboxes) { const hitW = w * 1.0 * SETTINGS.hitboxScale; ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(-hitW/2, -h*1.2, hitW, h*1.4); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(-hitW/2, -h*1.2, hitW, h*1.4); }
+        if (SETTINGS.showHitboxes && !car.hit) { const hitW = w * 1.0 * SETTINGS.hitboxScale; ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(-hitW/2, -h*1.2, hitW, h*1.4); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(-hitW/2, -h*1.2, hitW, h*1.4); }
         ctx.restore();
     }
     function renderObstacleModel(s, obj, laneW, pct) {
         const p1 = s.p1.screen; const scale = p1.scale; const sx = p1.x + (scale * obj.x * laneW * W / 2); const sy = p1.y;
         const style = OBS_STYLES[obj.style] || OBS_STYLES['crate']; const sizeMult = obj.size || 1; const w = style.w * scale * W / 2 * sizeMult; const h = style.h * scale * H / 2 * sizeMult;
         if (w < 2) return;
-        ctx.save(); ctx.translate(sx, sy);
+        ctx.save();
+
+        // --- 核心更新：障碍物飞行 ---
+        if (obj.hit) {
+            ctx.translate(sx, sy - (obj.flyY || 0) * scale * 5);
+            ctx.rotate(obj.rot || 0);
+        } else {
+            ctx.translate(sx, sy);
+        }
+
         const parallax = (sx - W/2) / (W/2); const depthX = parallax * w * 0.5; const topY = -h * 0.8;
         if (style.type === 'box') { ctx.fillStyle = style.color; ctx.fillRect(-w/2, -h, w, h); ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.moveTo(-w/2, -h); ctx.lineTo(w/2, -h); ctx.lineTo(w/2 + depthX, -h + topY); ctx.lineTo(-w/2 + depthX, -h + topY); ctx.fill(); ctx.fillStyle = '#aa4400'; ctx.beginPath(); if (parallax > 0) { ctx.moveTo(-w/2, -h); ctx.lineTo(-w/2, 0); ctx.lineTo(-w/2 + depthX, topY); ctx.lineTo(-w/2 + depthX, -h + topY); } else { ctx.moveTo(w/2, -h); ctx.lineTo(w/2, 0); ctx.lineTo(w/2 + depthX, topY); ctx.lineTo(w/2 + depthX, -h + topY); } ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-w/2, -h); ctx.lineTo(w/2, 0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w/2, -h); ctx.lineTo(-w/2, 0); ctx.stroke(); } else if (style.type === 'trap') { ctx.fillStyle = '#888'; ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(-w/3, -h); ctx.fill(); ctx.fillStyle = '#555'; ctx.beginPath(); if(parallax > 0) { ctx.moveTo(-w/2, 0); ctx.lineTo(-w/3, -h); ctx.lineTo(-w/3+depthX, -h-20); ctx.lineTo(-w/2+depthX, -20); } else { ctx.moveTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(w/3+depthX, -h-20); ctx.lineTo(w/2+depthX, -20); } ctx.fill(); } else { ctx.shadowBlur = 20; ctx.shadowColor = style.color; ctx.fillStyle = style.color; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w/2, -h/2); ctx.lineTo(0, -h); ctx.lineTo(-w/2, -h/2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(10, -h/2); ctx.lineTo(0, 0); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
-        if (SETTINGS.showHitboxes) { const hitW = w * 1.0 * SETTINGS.hitboxScale; ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(-hitW/2, -h*1.2, hitW, h*1.4); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(-hitW/2, -h*1.2, hitW, h*1.4); }
+        if (SETTINGS.showHitboxes && !obj.hit) { const hitW = w * 1.0 * SETTINGS.hitboxScale; ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(-hitW/2, -h*1.2, hitW, h*1.4); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(-hitW/2, -h*1.2, hitW, h*1.4); }
         ctx.restore();
     }
     function renderPlayer() {
@@ -813,11 +835,25 @@
         ctx.restore();
     }
 
-    // --- 音效 (保持不变) ---
+    // --- 音效系统 ---
     function initAudio() { const AC = window.AudioContext || window.webkitAudioContext; game.audio.ctx = new AC(); const ctxA = game.audio.ctx; game.audio.osc = ctxA.createOscillator(); game.audio.osc.type = 'sawtooth'; game.audio.gain = ctxA.createGain(); game.audio.gain.gain.value = 0; game.audio.osc.connect(game.audio.gain).connect(ctxA.destination); game.audio.osc.start(); const bSize = ctxA.sampleRate * 2; const b = ctxA.createBuffer(1, bSize, ctxA.sampleRate); const d = b.getChannelData(0); for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1; game.audio.noise = ctxA.createBufferSource(); game.audio.noise.buffer = b; game.audio.noise.loop = true; game.audio.noiseGain = ctxA.createGain(); game.audio.noiseGain.gain.value = 0; game.audio.noise.connect(game.audio.noiseGain).connect(ctxA.destination); game.audio.noise.start(); }
     function updateAudio(dt) { if (!game.audio.ctx) return; const r = game.player.speed / CONFIG.maxSpeed; const now = game.audio.ctx.currentTime; const engineFreq = 60 + r * 300 + (game.keys.up ? 50 : 0); game.audio.osc.frequency.setTargetAtTime(engineFreq, now, 0.1); game.audio.gain.gain.setTargetAtTime(0.1 + r * 0.1, now, 0.1); game.audio.noiseGain.gain.setTargetAtTime(r * 0.4, now, 0.1); }
     function playExplosionSound(intensity=1){ try{ if(!game.audio.ctx) return; const ctxA = game.audio.ctx; const buffer = ctxA.createBuffer(1, ctxA.sampleRate*0.25, ctxA.sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<data.length;i++){ const t = i/data.length; data[i] = (Math.random()*2-1)*Math.pow(1-t,2.4)*intensity; } const src = ctxA.createBufferSource(); src.buffer=buffer; const gain = ctxA.createGain(); gain.gain.value=0.6*intensity; const bp = ctxA.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=180+intensity*180; src.connect(bp).connect(gain).connect(ctxA.destination); src.start(); }catch(e){} }
     function playTone(freq, dur, type='sine') { if(!game.audio.ctx) return; const o = game.audio.ctx.createOscillator(); o.type = type; o.frequency.value = freq; const g = game.audio.ctx.createGain(); o.connect(g).connect(game.audio.ctx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.001, game.audio.ctx.currentTime + dur); o.stop(game.audio.ctx.currentTime + dur); }
+    // 新增：撞击音效
+    function playCrashSound() {
+        if(!game.audio.ctx) return;
+        const ctxA = game.audio.ctx;
+        const osc = ctxA.createOscillator();
+        const gain = ctxA.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(100, ctxA.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, ctxA.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.5, ctxA.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctxA.currentTime + 0.3);
+        osc.connect(gain).connect(ctxA.destination);
+        osc.start(); osc.stop(ctxA.currentTime + 0.3);
+    }
 
     init();
 </script>
