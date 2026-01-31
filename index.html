@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>狂飙：绝境逃亡 - 终极版</title>
+    <title>狂飙：冲锋即胜利 - 终极爽快版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
 
@@ -26,9 +26,14 @@
         #rage-fill { width: 0%; height: 100%; background: repeating-linear-gradient(45deg, #f00, #f00 10px, #900 10px, #900 20px); transition: width 0.05s linear; }
         #rage-label { position: absolute; width: 100%; text-align: center; top: -25px; color: #f00; font-weight: bold; text-shadow: 0 0 5px #000; letter-spacing: 2px; }
 
+        /* 冲锋时刻的积分爽感UI */
+        #rush-score-container { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; display: none; z-index: 50; }
+        .rush-title { font-size: 40px; color: #ff0; text-shadow: 0 0 20px #f00; font-weight: 900; letter-spacing: 5px; animation: pulse 0.1s infinite; }
+        .rush-val { font-size: 120px; color: #fff; text-shadow: 5px 5px 0 #f0f; font-weight: 900; font-family: 'Orbitron'; }
+
         /* 消息提示 */
-        #center-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; z-index: 10; display: none; text-shadow: 0 0 20px #f00;}
-        .msg-big { font-size: 100px; font-weight: 900; color: #fff; -webkit-text-stroke: 3px #000; letter-spacing: 5px; }
+        #center-msg { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; z-index: 10; display: none; text-shadow: 0 0 20px #f00;}
+        .msg-big { font-size: 80px; font-weight: 900; color: #fff; -webkit-text-stroke: 3px #000; letter-spacing: 5px; }
         .msg-sub { font-size: 30px; color: #0ff; background: #000; padding: 5px 20px; margin-top: 10px; display: inline-block; }
 
         /* 结局屏幕 */
@@ -99,11 +104,17 @@
     <canvas id="gameCanvas"></canvas>
     <div id="countdown"></div>
 
+    <!-- 核心需求 2：冲锋时的累加分 UI -->
+    <div id="rush-score-container">
+        <div class="rush-title">RUSH BONUS</div>
+        <div id="rush-accum-score" class="rush-val">0</div>
+    </div>
+
     <!-- HUD -->
     <div id="hud" class="ui-layer" style="display: none;">
         <div id="hud-top">
             <div class="stat-group">
-                <div class="stat-label">积分 (目标 30k)</div>
+                <div class="stat-label">总积分</div>
                 <div id="score-val" class="stat-value">0</div>
             </div>
             <div class="stat-group" style="align-items: flex-end;">
@@ -117,7 +128,7 @@
         </div>
         <div id="center-msg"></div>
         <div id="rage-container">
-            <div id="rage-label">NITRO / 氮气</div>
+            <div id="rage-label">NITRO CHARGE / 攒满开启超级冲锋</div>
             <div id="rage-fill"></div>
         </div>
     </div>
@@ -132,12 +143,11 @@
     <!-- 菜单 -->
     <div id="menu-layer" class="ui-layer">
         <div class="glitch-title">野蛮冲撞</div>
-        <!-- 核心需求 2：主界面紧张文案 -->
         <div class="story-text">
             ⚠ 警告：未知物体正在高速接近<br>
-            你只能踩死油门，冲出这里！
+            开启【超级冲锋】即可逃离此地！
         </div>
-        <div style="color: #aaa; margin-bottom: 20px; text-shadow: 0 0 5px #fff;">点击任意位置开启音效 | 操作: 方向键移动 | 空格键射击</div>
+        <div style="color: #aaa; margin-bottom: 20px; text-shadow: 0 0 5px #fff;">点击任意位置开启音效 | 撞击/射击积攒怒气 | 速度过低失败</div>
         <div id="view-main" class="menu-view">
             <button onclick="startSequence()">启动引擎</button>
             <button onclick="switchView('settings')">系统设置</button>
@@ -187,7 +197,7 @@
         segL: 200, laneW: 2400, roadW: 2200, camH: 4500, baseCamD: 0.84, drawDist: 500,
         accel: 120, maxSpeed: 14000, rushSpeed: 120000,
         bulletSpeed: 50000,
-        winScore: 30000, // 核心需求 1：目标分数改为 30000
+        winScore: 999999, // 分数不再是胜利条件，仅用于显示
         centrifugal: 0.35, steerSens: 3.5,
         colors: { sky: '#050510', roadDark: '#101015', roadLight: '#181820', grassDark: '#020205', grassLight: '#040408' }
     };
@@ -206,7 +216,7 @@
         time: 0, dt: 0,
         segments: [], segmentOffsetIndex: 0,
         cars: [], particles: [], bullets: [], shockwaves: [],
-        player: { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0 },
+        player: { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0, rushScoreAccumulator: 0 },
         keys: { left: false, right: false, up: false, space: false },
         cam: { shake: 0, y: 0, fovOffset: 0, skyOffset: 0 },
         renderer: { flash: 0 },
@@ -237,7 +247,7 @@
             if(e.key === ' ') game.keys.space = false;
         });
         bindUI();
-        gameLoop(0); // 启动空循环以渲染菜单背景
+        gameLoop(0);
     }
 
     function bindUI() {
@@ -247,26 +257,33 @@
     }
 
     function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-
     function switchView(name) {
         document.getElementById('view-main').style.display = name === 'main' ? 'flex' : 'none';
         document.getElementById('view-settings').style.display = name === 'settings' ? 'flex' : 'none';
     }
-
     function applySettings() { switchView('main'); }
 
-    // --- 音频初始化辅助函数 ---
+    // --- 音频初始化与管理 ---
     function tryInitAudio() {
         if (!game.audio.ctx) {
             initAudio();
-            playMenuMusic(); // 核心需求 2：主界面紧张音效
+            playMenuMusic();
         }
+    }
+
+    // 核心需求 1：关闭其他音效，只保留主界面音效
+    function stopGameAudio() {
+        if (!game.audio.ctx) return;
+        // 停止引擎音
+        if (game.audio.gain) game.audio.gain.gain.setTargetAtTime(0, game.audio.ctx.currentTime, 0.05);
+        if (game.audio.noiseGain) game.audio.noiseGain.gain.setTargetAtTime(0, game.audio.ctx.currentTime, 0.05);
     }
 
     function returnToMenu() {
         document.getElementById('end-screen').style.display = 'none';
         document.getElementById('hud').style.display = 'none';
         document.getElementById('countdown').style.display = 'none';
+        document.getElementById('rush-score-container').style.display = 'none';
         document.getElementById('game-container').classList.remove('rush-active');
         document.getElementById('menu-layer').style.display = 'flex';
         switchView('main');
@@ -274,17 +291,17 @@
         game.state = STATE.MENU;
         game.player.speed = 0;
 
-        // 重新播放菜单音乐
-        playMenuMusic();
+        stopGameAudio(); // 停止引擎等杂音
+        playMenuMusic(); // 确保主界面音乐在放
     }
 
     function startSequence() {
         if (!game.audio.ctx) initAudio();
-        stopMenuMusic(); // 停止菜单音乐
+        stopMenuMusic(); // 停止主界面音乐
 
         game.segments = []; game.segmentOffsetIndex = 0;
         game.cars = []; game.particles = []; game.bullets = []; game.shockwaves = [];
-        game.player = { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0 };
+        game.player = { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0, rushScoreAccumulator: 0 };
         game.cam = { shake: 0, y: 0, fovOffset: 0, skyOffset: 0 };
         game.renderer.flash = 0;
         game.victoryTimer = 0;
@@ -294,6 +311,7 @@
 
         document.getElementById('menu-layer').style.display = 'none';
         document.getElementById('hud').style.display = 'block';
+        document.getElementById('rush-score-container').style.display = 'none';
 
         game.state = STATE.COUNTDOWN;
         runCountdown(3);
@@ -310,7 +328,7 @@
             el.innerText = "逃离!"; el.style.color = "#0f0"; el.className = 'count-anim';
             playTone(800, 0.3, 'square');
             game.state = STATE.PLAY; game.player.speed = 3000; game.cam.shake = 20;
-            showMsg("全速前进", "冲出这里!");
+            showMsg("全速前进", "积攒怒气开启冲锋!");
             setTimeout(() => { el.style.display = 'none'; }, 1000);
         }
     }
@@ -399,7 +417,6 @@
             update(dt);
             render();
         } else {
-            // 菜单背景动画
             if(game.segments.length === 0) extendTrack(50);
             game.player.z += 2000 * dt;
             const currentIdx = Math.floor(game.player.z / CONFIG.segL);
@@ -433,6 +450,11 @@
 
         p.z += p.speed * dt;
 
+        // 核心需求 3：游戏开始积分随时间累加
+        if (game.state === STATE.PLAY || game.state === STATE.RUSH) {
+            p.score += 500 * dt; // 只要活着就每秒+500分
+        }
+
         const currentIdx = Math.floor(p.z / CONFIG.segL);
         if ((currentIdx - game.segmentOffsetIndex) > game.segments.length - 300) extendTrack(200);
         if ((currentIdx - game.segmentOffsetIndex) > 200) {
@@ -460,7 +482,6 @@
         if (p.x < -currentRoadLimit) { p.x = -currentRoadLimit; if(p.speed>8000) p.speed-=200; }
         if (p.x > currentRoadLimit) { p.x = currentRoadLimit; if(p.speed>8000) p.speed-=200; }
 
-        // --- 射击逻辑 ---
         game.shootCooldown -= dt;
         if (game.keys.space && game.shootCooldown <= 0 && game.state === STATE.PLAY) {
             spawnBullet(p.x, p.z, p.speed);
@@ -469,7 +490,6 @@
         }
         updateBullets(dt);
 
-        // --- 物理更新 ---
         game.cars.forEach(car => {
             if (car.active && car.hit) {
                 car.x += car.vx * dt;
@@ -480,9 +500,7 @@
                 if (car.flyY > 800) {
                     car.active = false;
                     triggerBigExplosion(car.x, car.z, car.flyY, '#fa0');
-                    game.player.score += 1000;
                 }
-
                 if(car.flyY < 0) car.active = false;
             } else if (car.active) {
                 car.z += car.speed * dt;
@@ -499,7 +517,6 @@
             }
         });
 
-        // --- 碰撞检测 ---
         const baseHitWidth = 0.2;
         const dynamicHitWidth = baseHitWidth * SETTINGS.hitboxScale;
 
@@ -515,28 +532,23 @@
             }
         });
 
-        // --- 状态管理 ---
+        // --- 核心需求 2：胜利条件修改为 触发一次超级冲锋并结束 ---
         if (isRush) {
-            p.rage -= dt * 20;
-            p.score += 5000 * dt;
-            if (p.score >= CONFIG.winScore) {
-                if (game.victoryTimer === 0) showMsg("目标达成!", "你安全了!");
-                game.victoryTimer += dt;
-                p.rage = 100;
-                if (game.victoryTimer > 3.0) triggerVictory();
-            } else if (p.rage <= 0) {
-                exitRushMode();
+            p.rage -= dt * 10; // 冲锋消耗速度 (持续约10秒)
+
+            // 冲锋期间的疯狂加分逻辑
+            const rushBonus = 10000 * dt;
+            p.score += rushBonus;
+            p.rushScoreAccumulator += rushBonus; // 用于UI显示
+
+            if (p.rage <= 0) {
+                // 冲锋结束，胜利！
+                triggerVictory();
             }
         } else {
             p.rage = Math.max(0, p.rage - dt * 2);
-            if (p.score >= CONFIG.winScore) { // 普通模式也能获胜
-                game.victoryTimer += dt;
-                if (game.victoryTimer > 1.0) triggerVictory();
-            }
-
             if (p.rage >= 100) enterRushMode();
 
-            // 失败判定
             if (p.speed < 2000 && game.time > 3.0) {
                 triggerGameOver();
             }
@@ -598,10 +610,12 @@
         if (type === 'car') {
             target.active = false;
             triggerBigExplosion(target.x, target.z, 0, '#0ff');
-            game.player.score += 1500;
+
+            // 核心需求 3：子弹击中增加积分大幅增加
+            game.player.score += 3000;
             game.player.rage += 5;
             game.player.kills++;
-            showMsg("目标摧毁", "+1500");
+            showMsg("目标摧毁", "+3000");
         } else {
             knockbackObject(target);
             const seg = findSegment(bullet.z);
@@ -620,16 +634,14 @@
         spawnExplosion(hitPos.x, hitPos.y, 20, '#fff');
         playCrashSound();
 
-        // --- 核心需求 3：碰撞逻辑修改 ---
         if (type === 'car') {
-            // 撞车：不减速，增加怒气，屏幕闪白
-            game.renderer.flash = 0.8; // 增加闪屏
-            game.player.rage += 20;    // 增加怒气
-            game.player.score += 5000; // 增加积分
+            // 核心需求 3：撞击车辆积分增加
+            game.renderer.flash = 0.8;
+            game.player.rage += 20;
+            game.player.score += 5000;
             game.player.kills++;
-            showMsg("野蛮冲撞", "碾碎它们!");
+            showMsg("野蛮冲撞", "+5000");
         } else {
-            // 撞障碍物：减速
             game.player.speed *= 0.7;
             showMsg("碰撞", "速度受损");
         }
@@ -666,33 +678,38 @@
 
     function triggerGameOver() {
         game.state = STATE.GAMEOVER;
+        stopGameAudio(); // 失败停止引擎
         const screen = document.getElementById('end-screen');
         const title = document.getElementById('end-title');
         const msg = document.getElementById('end-msg');
         title.innerText = "被捕获";
         title.className = "end-title lose-text";
-        msg.innerText = "你没能冲出包围网 | 最终得分: " + Math.floor(game.player.score);
+        msg.innerText = "未能开启超级冲锋 | 最终得分: " + Math.floor(game.player.score);
         screen.style.display = 'flex';
         playTone(100, 1.5, 'sawtooth');
     }
 
     function triggerVictory() {
         game.state = STATE.VICTORY;
+        exitRushMode(); // 胜利时退出视觉特效
+        stopGameAudio(); // 胜利停止引擎
         const screen = document.getElementById('end-screen');
         const title = document.getElementById('end-title');
         const msg = document.getElementById('end-msg');
         title.innerText = "逃出生天";
         title.className = "end-title win-text";
-        msg.innerText = "你成功摆脱了追踪! | 最终得分: " + Math.floor(game.player.score);
+        msg.innerText = "超级冲锋达成! | 最终得分: " + Math.floor(game.player.score);
         screen.style.display = 'flex';
         playTone(600, 0.2, 'sine'); setTimeout(()=>playTone(800, 0.4, 'sine'), 200);
     }
 
     function enterRushMode() {
         game.state = STATE.RUSH;
+        game.player.rushScoreAccumulator = 0; // 重置累加器
         document.getElementById('game-container').classList.add('rush-active');
         document.getElementById('rage-container').classList.add('full');
-        showMsg("氮气满载", "自动极速 / 无敌模式");
+        document.getElementById('rush-score-container').style.display = 'block'; // 显示大分
+        showMsg("超级冲锋", "坚持住!");
     }
     function exitRushMode() {
         if (game.state === STATE.VICTORY) return;
@@ -700,6 +717,7 @@
         game.player.rage = 0;
         document.getElementById('game-container').classList.remove('rush-active');
         document.getElementById('rage-container').classList.remove('full');
+        document.getElementById('rush-score-container').style.display = 'none';
     }
 
     function render() {
@@ -837,7 +855,7 @@
                 const screenPos = screenPosFromTarget({x: p.x, z: p.z}, seg);
                 const scale = seg.p1.screen.scale;
                 const screenY = screenPos.y - (p.y * scale * 2);
-                const size = Math.max(0, p.size * scale); // 修复负半径报错
+                const size = Math.max(0, p.size * scale);
                 if (size <= 0) return;
 
                 ctx.globalAlpha = p.life;
@@ -903,6 +921,7 @@
 
     function updateUI() {
         document.getElementById('score-val').innerText = Math.floor(game.player.score);
+        document.getElementById('rush-accum-score').innerText = "+" + Math.floor(game.player.rushScoreAccumulator); // 冲锋大分
         document.getElementById('speed-val').innerText = Math.floor(game.player.speed/100);
         document.getElementById('kill-val').innerText = game.player.kills;
         document.getElementById('rage-fill').style.width = game.player.rage + '%';
@@ -1020,7 +1039,6 @@
         game.audio.noise.start();
     }
 
-    // --- 核心需求 2：主界面紧张背景音效 ---
     function playMenuMusic() {
         if (!game.audio.ctx || game.audio.isMenuMusicPlaying) return;
         game.audio.isMenuMusicPlaying = true;
@@ -1028,11 +1046,8 @@
 
         let nextNoteTime = ctxA.currentTime;
 
-        // 简单的紧张节奏生成器 (类似心跳或警报)
         function scheduleBeat() {
             if (!game.audio.isMenuMusicPlaying) return;
-
-            // 低频 Boom
             const osc = ctxA.createOscillator();
             const gain = ctxA.createGain();
             osc.frequency.value = 60;
@@ -1043,7 +1058,6 @@
             osc.start(nextNoteTime);
             osc.stop(nextNoteTime + 0.5);
 
-            // 高频 Click (制造压迫感)
             const osc2 = ctxA.createOscillator();
             const gain2 = ctxA.createGain();
             osc2.type = 'square';
@@ -1054,8 +1068,8 @@
             osc2.start(nextNoteTime + 0.25);
             osc2.stop(nextNoteTime + 0.3);
 
-            nextNoteTime += 0.5; // 每500ms一拍 (120BPM)
-            game.audio.menuLoop = setTimeout(scheduleBeat, 400); // 调度下一次
+            nextNoteTime += 0.5;
+            game.audio.menuLoop = setTimeout(scheduleBeat, 400);
         }
         scheduleBeat();
     }
