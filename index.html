@@ -320,11 +320,13 @@
 
         game.cars.forEach(car => {
             car.z += car.speed * dt;
-            if (Math.abs(car.z - p.z) < 300 && Math.abs(car.x - p.x) < 0.7) handleCollision(car, 'car');
+            if (Math.abs(car.z - p.z) < 300 && Math.abs(car.x - p.x) < 0.7) handleCollision(car, 'car', currentSeg);
         });
         currentSeg.sprites.forEach((s, i) => {
-            if (Math.abs(p.x - s.x) < 0.7) { handleCollision(s, 'obs'); currentSeg.sprites.splice(i, 1); }
+            if (Math.abs(p.x - s.x) < 0.7) { handleCollision(s, 'obs', currentSeg); currentSeg.sprites.splice(i, 1); }
         });
+        // 清理失效车辆
+        game.cars = game.cars.filter(c => c.active !== false);
 
         if (game.state === STATE.RUSH) {
             p.rage -= dt * 20;
@@ -351,12 +353,13 @@
         return 0;
     }
 
-    function handleCollision(target, type) {
+    function handleCollision(target, type, segRef) {
         const p = game.player;
         const isRush = game.state === STATE.RUSH;
         game.cam.shake = isRush ? 15 : 30;
-        spawnExplosion(W/2, H/2+50, 40, isRush ? '#0ff' : '#f90');
-        spawnSmoke(W/2, H/2+50, 30);
+        const hitPos = screenPosFromTarget(target, segRef);
+        spawnExplosion(hitPos.x, hitPos.y, 40, isRush ? '#0ff' : '#f90');
+        spawnSmoke(hitPos.x, hitPos.y, 30);
         playExplosionSound(isRush ? 0.8 : 1.2);
 
         if (isRush) {
@@ -366,6 +369,7 @@
             p.speed *= 0.6;
             game.player.rage += CONFIG.ragePerHit;
             showMsg("IMPACT", "SPEED LOST");
+            if (type === 'car') { target.active = false; target.z = -5000; }
         }
     }
 
@@ -432,6 +436,17 @@
             ctx.stroke();
         }
         ctx.restore();
+    }
+
+    function screenPosFromTarget(target, segRef){
+        const laneW = CONFIG.laneW * SETTINGS.roadWidthScale;
+        const seg = segRef || game.segments[(Math.floor((target.z||game.player.z)/CONFIG.segL)) % game.segments.length];
+        const wz = target.z || (seg ? seg.p1.world.z : game.player.z);
+        const wy = seg ? seg.p1.world.y : 0;
+        const offsetZ = wz - game.player.z;
+        const temp = { world:{ y: wy, z: wz }, camera:{}, screen:{} };
+        project(temp, (target.x||0) * laneW, offsetZ);
+        return { x: temp.screen.x, y: temp.screen.y };
     }
     function updateUI() {
         document.getElementById('score-val').innerText = Math.floor(game.player.score);
