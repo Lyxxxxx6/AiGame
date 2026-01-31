@@ -2,67 +2,76 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>CYBER RUSH: ULTIMATE EDITION</title>
+    <title>狂飙之油门焊死</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-        body { margin: 0; overflow: hidden; background: #050510; color: #fff; font-family: 'Orbitron', sans-serif; user-select: none; }
+        /* 字体增加微软雅黑回退，确保中文显示正常 */
+        body { margin: 0; overflow: hidden; background: #050510; color: #fff; font-family: 'Orbitron', 'Microsoft YaHei', sans-serif; user-select: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; overflow: hidden;}
         canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
         /* UI 层 */
         .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         #hud-top { display: flex; justify-content: space-between; padding: 30px; font-weight: 900; letter-spacing: 2px; text-shadow: 0 0 10px #0ff; }
-        .stat-value { font-size: 40px; color: #fff; text-shadow: 2px 2px 0 #f0f; }
+        .stat-value { font-size: 40px; color: #fff; text-shadow: 2px 2px 0 #f0f; font-family: 'Orbitron'; }
+        .stat-label { font-size: 16px; color: #0ff; margin-bottom: 5px; }
+
         #speed-container { position: absolute; top: 10%; left: 50%; transform: translateX(-50%) skew(-10deg); text-align: center; }
-        #speed-val { font-size: 100px; line-height: 80px; font-weight: 900; background: linear-gradient(to bottom, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 15px #0ff); }
-        #speed-unit { font-size: 24px; color: #0ff; letter-spacing: 5px; }
+        #speed-val { font-size: 100px; line-height: 80px; font-weight: 900; background: linear-gradient(to bottom, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 15px #0ff); transition: transform 0.1s; font-family: 'Orbitron'; }
+        #speed-unit { font-size: 24px; color: #0ff; letter-spacing: 2px; }
+
         #rage-container { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); width: 600px; height: 40px; border: 4px solid #fff; transform: skew(-20deg); box-shadow: 0 0 30px #f00; background: rgba(0,0,0,0.5); }
         #rage-fill { width: 0%; height: 100%; background: repeating-linear-gradient(45deg, #f00, #f00 10px, #900 10px, #900 20px); transition: width 0.05s linear; }
-        .full #rage-fill { filter: brightness(1.5); box-shadow: 0 0 20px #f00; }
 
         #center-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; z-index: 10; display: none; text-shadow: 0 0 20px #f00;}
-        .msg-big { font-size: 120px; font-weight: 900; color: #fff; -webkit-text-stroke: 4px #000; animation: shake 0.2s infinite; }
-        .msg-sub { font-size: 40px; color: #0ff; background: #000; padding: 5px 20px; }
+        .msg-big { font-size: 100px; font-weight: 900; color: #fff; -webkit-text-stroke: 3px #000; letter-spacing: 5px; }
+        .msg-sub { font-size: 30px; color: #0ff; background: #000; padding: 5px 20px; margin-top: 10px; display: inline-block; }
+
+        /* 倒计时样式 */
+        #countdown { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 250px; font-weight: 900; color: #fff; -webkit-text-stroke: 5px #000; display: none; z-index: 100; font-style: italic; font-family: 'Orbitron'; }
+        .count-anim { animation: pop 0.9s cubic-bezier(0.1, 0.7, 1.0, 0.1) forwards; }
+        @keyframes pop { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.0); opacity: 0; } }
 
         /* 菜单样式 */
         #menu-layer { background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; }
-        .glitch-title { font-size: 80px; font-weight: 900; color: #fff; text-shadow: 4px 0 #f00, -4px 0 #0ff; margin-bottom: 20px; position: relative; }
+        .glitch-title { font-size: 80px; font-weight: 900; color: #fff; text-shadow: 4px 0 #f00, -4px 0 #0ff; margin-bottom: 20px; font-family: 'Orbitron', sans-serif; letter-spacing: 5px; }
         .menu-view { display: flex; flex-direction: column; align-items: center; width: 100%; transition: opacity 0.3s; }
-
-        .settings-box { background: rgba(0,20,40,0.95); border: 1px solid #0ff; padding: 30px; margin-bottom: 20px; width: 600px; text-align: left; box-shadow: 0 0 50px rgba(0,255,255,0.15); border-radius: 4px; max-height: 70vh; overflow-y: auto; }
-        .settings-box::-webkit-scrollbar { width: 8px; background: #000; }
-        .settings-box::-webkit-scrollbar-thumb { background: #0ff; }
-
-        .setting-item { margin-bottom: 20px; display: flex; flex-direction: column; }
-        .setting-header { color: #fff; font-size: 16px; display:flex; justify-content:space-between; margin-bottom: 8px; font-weight: 700; align-items: center;}
-
+        .settings-box { background: rgba(0,20,40,0.9); border: 1px solid #0ff; padding: 30px; margin-bottom: 20px; width: 600px; text-align: left; box-shadow: 0 0 30px rgba(0,255,255,0.1); border-radius: 4px; }
+        .setting-item { margin-bottom: 25px; }
+        .setting-label { color: #fff; font-size: 18px; display:flex; justify-content:space-between; margin-bottom: 8px; font-weight: 700;}
         input[type=range] { width: 100%; height: 6px; background: #333; outline: none; -webkit-appearance: none; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: #0ff; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 10px #0ff; }
 
         /* 开关样式 */
-        .switch-label { position: relative; display: inline-block; width: 60px; height: 30px; }
-        .switch-label input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border: 2px solid #555; }
-        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; box-shadow: 0 0 5px #000; }
-        input:checked + .slider { background-color: #0ff; border-color: #fff; }
+        .switch-wrap { position: relative; display: inline-block; width: 60px; height: 30px; }
+        .switch-wrap input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border: 2px solid #fff; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; }
+        input:checked + .slider { background-color: #0ff; }
         input:checked + .slider:before { transform: translateX(30px); background-color: #000; }
 
-        button { background: #000; border: 2px solid #0ff; color: #0ff; padding: 15px 40px; margin: 10px; font-size: 24px; font-family: 'Orbitron'; cursor: pointer; text-transform: uppercase; transition: 0.2s; position: relative; overflow: hidden; width: 400px; font-weight: bold; }
-        button:hover { background: #0ff; color: #000; box-shadow: 0 0 30px #0ff; transform: scale(1.05); }
-
-        @keyframes shake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } 100% { transform: translate(2px, -2px); } }
-        .rush-active canvas { filter: contrast(1.2) saturate(1.2); }
+        button { background: #000; border: 2px solid #0ff; color: #0ff; padding: 15px 40px; margin: 10px; font-size: 24px; font-family: 'Orbitron', 'Microsoft YaHei'; cursor: pointer; text-transform: uppercase; transition: 0.2s; position: relative; overflow: hidden; width: 400px; font-weight: bold; }
+        button:hover { background: #0ff; color: #000; box-shadow: 0 0 30px #0ff; }
     </style>
 </head>
 <body>
-
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 
+    <!-- 倒计时层 -->
+    <div id="countdown"></div>
+
+    <!-- HUD (中文界面) -->
     <div id="hud" class="ui-layer" style="display: none;">
         <div id="hud-top">
-            <div class="stat-group"><div class="stat-label">SCORE</div><div id="score-val" class="stat-value">0</div></div>
-            <div class="stat-group" style="align-items: flex-end;"><div class="stat-label">KILLS</div><div id="kill-val" class="stat-value" style="color:#f33">0</div></div>
+            <div class="stat-group">
+                <div class="stat-label">得分</div>
+                <div id="score-val" class="stat-value">0</div>
+            </div>
+            <div class="stat-group" style="align-items: flex-end;">
+                <div class="stat-label">击杀</div>
+                <div id="kill-val" class="stat-value" style="color:#f33">0</div>
+            </div>
         </div>
         <div id="speed-container">
             <div id="speed-val">0</div>
@@ -72,55 +81,46 @@
         <div id="rage-container"><div id="rage-fill"></div></div>
     </div>
 
+    <!-- 菜单层 (中文界面) -->
     <div id="menu-layer" class="ui-layer">
-        <div class="glitch-title">CYBER RUSH</div>
+        <div class="glitch-title">赛博狂飙</div>
         <div id="view-main" class="menu-view">
-            <button onclick="startGame()">启动引擎</button>
+            <button onclick="startSequence()">启动引擎</button>
             <button onclick="switchView('settings')">系统设置</button>
         </div>
-
         <div id="view-settings" class="menu-view" style="display: none;">
             <div class="settings-box">
                 <h3 style="color: #0ff; border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 0;">显示设置</h3>
-
                 <div class="setting-item">
-                    <div class="setting-header">
-                        <span>调试模式 (Hitbox)</span>
-                        <label class="switch-label">
+                    <label class="setting-label">碰撞盒子 (调试用)
+                        <label class="switch-wrap">
                             <input type="checkbox" id="set-hitbox">
                             <span class="slider"></span>
                         </label>
-                    </div>
+                    </label>
                 </div>
 
-                <h3 style="color: #0ff; border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;">赛道生成</h3>
+                <h3 style="color: #0ff; border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;">生成参数</h3>
                 <div class="setting-item">
-                    <div class="setting-header">建筑密度 <span id="val-den" style="color:#0f0">中等</span></div>
+                    <label class="setting-label">弯道强度 <span id="val-curve" style="color:#0f0">100%</span></label>
+                    <input type="range" id="set-curve" min="50" max="150" value="100">
+                </div>
+                <div class="setting-item">
+                    <label class="setting-label">建筑/障碍密度 <span id="val-den" style="color:#0f0">中等</span></label>
                     <input type="range" id="set-den" min="0" max="10" value="5">
                 </div>
                 <div class="setting-item">
-                    <div class="setting-header">赛道宽度 <span id="val-road" style="color:#0f0">100%</span></div>
-                    <input type="range" id="set-road" min="50" max="150" value="100">
-                </div>
-
-                <h3 style="color: #f0f; border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;">游戏参数</h3>
-                <div class="setting-item">
-                    <div class="setting-header">车流密度 <span id="val-traf" style="color:#f0f">2%</span></div>
+                    <label class="setting-label">车流密度 <span id="val-traf" style="color:#f0f">2%</span></label>
                     <input type="range" id="set-traf" min="0" max="10" value="2">
                 </div>
-                <div class="setting-item">
-                    <div class="setting-header">车流速度 <span id="val-spd" style="color:#ff0">正常</span></div>
-                    <input type="range" id="set-spd" min="1" max="5" value="2">
-                </div>
             </div>
-            <button onclick="applySettings()">应用更改</button>
-            <button onclick="switchView('main')" style="border-color:#666; color:#888;">返回</button>
+            <button onclick="applySettings()">保存设置</button>
         </div>
     </div>
 </div>
 
 <script>
-    // --- 车辆与障碍物样式库 ---
+    // --- 样式库 ---
     const CAR_STYLES = {
         'sedan': { w: 400, h: 220, color: '#333', lights: 'h-bar', speedVar: 1.0 },
         'truck': { w: 500, h: 450, color: '#112', lights: 'v-side', speedVar: 0.8 },
@@ -133,61 +133,50 @@
         'glitch':  { w: 250, h: 400, color: '#f0f', type: 'crystal' }
     };
 
-    // --- 核心配置 ---
+    // --- 核心常量 ---
     const CONFIG = {
-        segL: 200,          // 片段长度
-        laneW: 2400,        // 车道基础宽
-        roadW: 2200,        // 路面渲染宽
-
-        // --- 需求2：相机参数调整 ---
-        camH: 4500,         // 相机距离路面的悬挂高度 (Player Height)
-        camD: 0.84,         // 相机投影深度 (值越小FOV越大，看起来越远)
-        // -----------------------
-
-        drawDist: 500,      // 绘制距离
-        accel: 120,         // 加速度
-        maxSpeed: 14000,    // 最大速度
-        rushSpeed: 120000,  // 冲刺速度
-        rageDrain: 5,       // 怒气自然衰减
-        ragePerHit: 12,     // 撞击增加怒气
-        centrifugal: 0.35,  // 离心力系数
-        colors: {
-            sky: '#050510',
-            roadDark: '#101015', roadLight: '#181820',
-            grassDark: '#020205', grassLight: '#040408'
-        }
+        segL: 200,
+        laneW: 2400,
+        roadW: 2200,
+        camH: 4500,
+        baseCamD: 0.84,
+        drawDist: 500,
+        accel: 120,
+        maxSpeed: 14000,
+        rushSpeed: 120000,
+        rageDrain: 5,
+        ragePerHit: 8,
+        centrifugal: 0.1,
+        steerSens: 2.5,
+        colors: { sky: '#050510', roadDark: '#101015', roadLight: '#181820', grassDark: '#020205', grassLight: '#040408' }
     };
 
     const SETTINGS = {
+        showHitboxes: false,
         roadWidthScale: 1.0,
         buildDensity: 0.5,
         carDensity: 0.02,
-        carSpeedMult: 1.0,
-        showHitboxes: false // --- 需求1：碰撞盒子开关变量 ---
+        curveMult: 1.0
     };
 
-    const STATE = { MENU: 0, PLAY: 1, RUSH: 2 };
-
-    // 霓虹配色板
-    const PALETTES = [
-        { base: '#1a0033', light: '#d0f' },
-        { base: '#001a33', light: '#0ff' },
-        { base: '#331a00', light: '#fa0' },
-        { base: '#00331a', light: '#0f6' },
-        { base: '#222',    light: '#fff' }
-    ];
+    const STATE = { MENU: 0, COUNTDOWN: 1, PLAY: 2, RUSH: 3 };
+    const PALETTES = [ { base: '#1a0033', light: '#d0f' }, { base: '#001a33', light: '#0ff' }, { base: '#331a00', light: '#fa0' }, { base: '#00331a', light: '#0f6' }, { base: '#222', light: '#fff' } ];
 
     let game = {
         state: STATE.MENU,
         time: 0, dt: 0,
-        segments: [], cars: [], particles: [],
+        segments: [],
+        segmentOffsetIndex: 0,
+        cars: [], particles: [],
         player: { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0 },
-        keys: { left: false, right: false },
-        cam: { shake: 0, y: 0 }, // 增加 cam.y 用于地形跟随
-        audio: null
+        keys: { left: false, right: false, up: false },
+        cam: { shake: 0, y: 0, fovOffset: 0 },
+        audio: { ctx: null, osc: null, gain: null, noise: null, noiseGain: null }
     };
 
+    let TrackGen = { sectionLeft: 0, type: 'straight', y: 0, targetY: 0, startY: 0, targetCurve: 0, curve: 0 };
     let speedTier = 0;
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d', { alpha: false });
     let W, H;
@@ -198,399 +187,272 @@
         window.addEventListener('keydown', e => {
             if(e.key === 'ArrowLeft' || e.key === 'a') game.keys.left = true;
             if(e.key === 'ArrowRight' || e.key === 'd') game.keys.right = true;
+            if(e.key === 'ArrowUp' || e.key === 'w') game.keys.up = true;
         });
         window.addEventListener('keyup', e => {
             if(e.key === 'ArrowLeft' || e.key === 'a') game.keys.left = false;
             if(e.key === 'ArrowRight' || e.key === 'd') game.keys.right = false;
+            if(e.key === 'ArrowUp' || e.key === 'w') game.keys.up = false;
         });
         bindUI();
     }
 
     function bindUI() {
-        // 绑定 Hitbox 开关
-        document.getElementById('set-hitbox').onchange = function() {
-            SETTINGS.showHitboxes = this.checked;
-        };
+        document.getElementById('set-hitbox').onchange = function() { SETTINGS.showHitboxes = this.checked; };
 
         const denInput = document.getElementById('set-den');
-        denInput.oninput = function() {
-            SETTINGS.buildDensity = this.value / 10;
-            let txt = "稀疏"; if(this.value>3) txt="中等"; if(this.value>7) txt="密集";
-            document.getElementById('val-den').innerText = txt;
-        };
+        denInput.oninput = function() { SETTINGS.buildDensity = this.value / 10; document.getElementById('val-den').innerText = this.value > 3 ? (this.value>7?"密集":"中等") : "稀疏"; };
 
-        const roadInput = document.getElementById('set-road');
-        roadInput.oninput = function() {
-            SETTINGS.roadWidthScale = this.value / 100;
-            document.getElementById('val-road').innerText = this.value + "%";
-        };
+        const curveInput = document.getElementById('set-curve');
+        curveInput.oninput = function() { SETTINGS.curveMult = this.value / 100; document.getElementById('val-curve').innerText = this.value + "%"; };
 
         const trafInput = document.getElementById('set-traf');
-        trafInput.oninput = function() {
-            SETTINGS.carDensity = this.value / 100;
-            document.getElementById('val-traf').innerText = this.value + "%";
-        };
-
-        const spdInput = document.getElementById('set-spd');
-        spdInput.oninput = function() {
-            const val = parseInt(this.value);
-            SETTINGS.carSpeedMult = [0.5, 1.0, 1.5, 2.0, 3.0][val - 1];
-            document.getElementById('val-spd').innerText = ["缓慢", "正常", "快速", "狂暴", "封顶"][val - 1];
-        };
+        trafInput.oninput = function() { SETTINGS.carDensity = this.value / 100; document.getElementById('val-traf').innerText = this.value + "%"; };
     }
 
     function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+    function switchView(name) { document.getElementById('view-main').style.display = name === 'main' ? 'flex' : 'none'; document.getElementById('view-settings').style.display = name === 'settings' ? 'flex' : 'none'; }
+    function applySettings() { switchView('main'); }
 
-    function switchView(name) {
-        document.getElementById('view-main').style.display = name === 'main' ? 'flex' : 'none';
-        document.getElementById('view-settings').style.display = name === 'settings' ? 'flex' : 'none';
-    }
-
-    function applySettings() {
-        // 只需要重新生成赛道，不需要完全重启
-        if(game.state === STATE.PLAY || game.state === STATE.RUSH) {
-            // 如果在游戏中修改参数，可能需要热重载，这里简化为重新开始
-            startGame();
-        } else {
-            switchView('main'); // 在主菜单修改则返回主菜单
-        }
-    }
-
-    function startGame() {
-        if (!game.audio) initAudio();
-
+    function startSequence() {
+        if (!game.audio.ctx) initAudio();
         game.segments = [];
+        game.segmentOffsetIndex = 0;
         game.cars = [];
         game.particles = [];
         game.player = { x: 0, z: 0, speed: 0, score: 0, rage: 0, kills: 0 };
-        game.state = STATE.PLAY;
+        game.cam = { shake: 0, y: 0, fovOffset: 0 };
+        TrackGen = { sectionLeft: 0, type: 'straight', y: 0, targetY: 0, startY: 0, targetCurve: 0, curve: 0 };
 
-        generateTrack();
+        extendTrack(CONFIG.drawDist + 200);
 
         document.getElementById('menu-layer').style.display = 'none';
         document.getElementById('hud').style.display = 'block';
         document.getElementById('game-container').classList.remove('rush-active');
 
-        showMsg("引擎点火", "RACE START", 2000);
-
-        if (lastTime === 0) gameLoop(0); // 防止多重循环
+        game.state = STATE.COUNTDOWN;
+        runCountdown(3);
+        gameLoop(0);
     }
 
-    // --- 赛道生成算法 ---
-    function generateTrack() {
-        const totalSegs = 4000;
+    function runCountdown(n) {
+        const el = document.getElementById('countdown');
+        el.style.display = 'block';
+
+        if (n > 0) {
+            el.innerText = n;
+            el.style.color = "#fff";
+            el.className = ''; void el.offsetWidth; el.className = 'count-anim';
+            playTone(400 + (3-n)*100, 0.1);
+            setTimeout(() => runCountdown(n - 1), 1000);
+        } else {
+            el.innerText = "出发!"; // 汉化
+            el.style.color = "#0f0";
+            el.className = ''; void el.offsetWidth; el.className = 'count-anim';
+            playTone(800, 0.3, 'square');
+
+            game.state = STATE.PLAY;
+            game.player.speed = 3000;
+            game.cam.shake = 20;
+            showMsg("弹射起步", "引擎全开"); // 汉化
+
+            setTimeout(() => { el.style.display = 'none'; }, 1000);
+        }
+    }
+
+    function extendTrack(count) {
         const roadEdgeNorm = (CONFIG.roadW / CONFIG.laneW);
-
         let buildAccumulator = 0;
-        let currentHeight = 0;
-        let sectionType = 'straight';
-        let sectionLeft = 0;
-        let targetCurve = 0;
-        let targetHeight = 0;
-        let startHeight = 0;
 
-        for (let i = 0; i < totalSegs; i++) {
-            if (sectionLeft <= 0) {
+        for (let k = 0; k < count; k++) {
+            if (TrackGen.sectionLeft <= 0) {
                 const r = Math.random();
+                TrackGen.startY = TrackGen.y;
                 if (r < 0.3) {
-                    sectionType = 'straight'; sectionLeft = 50 + Math.random() * 50;
-                    targetCurve = 0; targetHeight = currentHeight;
+                    TrackGen.type = 'straight'; TrackGen.sectionLeft = 40 + Math.random() * 40;
+                    TrackGen.targetCurve = 0; TrackGen.targetY = TrackGen.y;
                 } else if (r < 0.7) {
-                    sectionType = 'curve'; sectionLeft = 80 + Math.random() * 100;
-                    targetCurve = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 4);
-                    targetHeight = currentHeight;
+                    TrackGen.type = 'curve'; TrackGen.sectionLeft = 60 + Math.random() * 60;
+                    TrackGen.targetCurve = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 3) * SETTINGS.curveMult;
+                    TrackGen.targetY = TrackGen.y;
                 } else {
-                    sectionType = 'hill'; sectionLeft = 60 + Math.random() * 60;
-                    targetCurve = 0; startHeight = currentHeight;
+                    TrackGen.type = 'hill'; TrackGen.sectionLeft = 40 + Math.random() * 60;
+                    TrackGen.targetCurve = 0;
                     let dir = (Math.random() > 0.5 ? 1 : -1);
-                    if (currentHeight > 4000) dir = -1;
-                    if (currentHeight < -2000) dir = 1;
-                    targetHeight = currentHeight + dir * (3000 + Math.random() * 4000);
+                    if (TrackGen.y > 6000) dir = -1;
+                    if (TrackGen.y < -2000) dir = 1;
+                    TrackGen.targetY = TrackGen.y + dir * (3000 + Math.random() * 4000);
                 }
             }
+            TrackGen.sectionLeft--;
 
-            let actualCurve = 0;
-            if (sectionType === 'curve') {
-                actualCurve = targetCurve;
-                if (sectionLeft < 20) actualCurve = targetCurve * (sectionLeft/20); // 缓入缓出
-            }
+            let actualCurve = TrackGen.targetCurve;
+            if (TrackGen.type === 'curve' && TrackGen.sectionLeft < 20) actualCurve = TrackGen.targetCurve * (TrackGen.sectionLeft/20);
+            if (TrackGen.type === 'hill' && Math.abs(TrackGen.targetY - TrackGen.y) > 10) { TrackGen.y += (TrackGen.targetY - TrackGen.startY) / 60; }
 
-            if (sectionType === 'hill') {
-                // 使用余弦插值让坡度更平滑
-                const progress = 1 - (sectionLeft / 60); // 粗略估算
-                // 简单的线性插值对于赛车游戏足够，或者缓动
-                if (Math.abs(targetHeight - currentHeight) > 10) {
-                    currentHeight += (targetHeight - startHeight) / 60;
-                }
-            }
-
-            sectionLeft--;
-
-            // 建筑生成
             const buildings = [];
             buildAccumulator += SETTINGS.buildDensity;
             if (buildAccumulator > 1.0 + Math.random()) {
                 buildAccumulator = 0;
                 const isLandmark = Math.random() < 0.05;
-                buildings.push(createBuilding(-1, roadEdgeNorm, isLandmark, i/totalSegs));
-                buildings.push(createBuilding(1, roadEdgeNorm, isLandmark, i/totalSegs));
+                buildings.push(createBuilding(-1, roadEdgeNorm, isLandmark));
+                buildings.push(createBuilding(1, roadEdgeNorm, isLandmark));
             }
 
-            // 障碍物与敌人
+            const i = game.segments.length + game.segmentOffsetIndex;
             const sprites = [];
-            // 障碍
-            if (i > 50 && Math.random() < 0.03) {
-                const safeZone = roadEdgeNorm * 0.8;
+
+            if (Math.random() < SETTINGS.buildDensity * 0.05) {
                 const keys = Object.keys(OBS_STYLES);
                 const styleKey = keys[Math.floor(Math.random() * keys.length)];
-                sprites.push({
-                    type: 'obs',
-                    style: styleKey,
-                    x: (Math.random()*2 - 1) * safeZone,
-                    size: 0.8 + Math.random() * 0.4
-                });
+                sprites.push({ type: 'obs', style: styleKey, x: (Math.random()*2 - 1) * 0.8, size: 0.8 + Math.random()*0.4 });
             }
-            // 敌人车辆
-            if (i > 50 && Math.random() < SETTINGS.carDensity) {
-                const safeZone = roadEdgeNorm * 0.8;
+            if (Math.random() < SETTINGS.carDensity) {
                 const keys = Object.keys(CAR_STYLES);
                 const styleKey = keys[Math.floor(Math.random() * keys.length)];
-                const styleData = CAR_STYLES[styleKey];
-                // 敌车速度根据玩家进程增加
-                let speed = (3000 + Math.random()*2000) * SETTINGS.carSpeedMult * styleData.speedVar;
-                game.cars.push({
-                    z: i * CONFIG.segL,
-                    x: (Math.random()*2-1)*safeZone,
-                    speed: speed,
-                    active: true,
-                    style: styleKey,
-                    colorVar: Math.random()
-                });
+                game.cars.push({ z: i * CONFIG.segL, x: (Math.random()*2-1)*0.7, speed: 3000 + Math.random()*4000, active: true, style: styleKey, colorVar: Math.random() });
             }
 
             game.segments.push({
                 index: i,
-                p1: { world: { y: currentHeight, z: i*CONFIG.segL }, camera: {}, screen: {} },
-                p2: { world: { y: currentHeight, z: (i+1)*CONFIG.segL }, camera: {}, screen: {} },
+                p1: { world: { y: TrackGen.y, z: i*CONFIG.segL }, camera: {}, screen: {} },
+                p2: { world: { y: TrackGen.y, z: (i+1)*CONFIG.segL }, camera: {}, screen: {} },
                 curve: actualCurve,
                 sprites: sprites,
                 buildings: buildings,
                 color: Math.floor(i/5)%2 ? CONFIG.colors.roadDark : CONFIG.colors.roadLight
             });
         }
-
-        // 平滑处理接缝
-        for(let i=0; i<totalSegs-1; i++) {
-            game.segments[i].p2.world.y = game.segments[i+1].p1.world.y;
-        }
     }
 
     function randRange(a,b){ return a + Math.random()*(b-a); }
-
-    function createBuilding(side, roadEdgeNorm, isLandmark, progress){
+    function createBuilding(side, roadEdgeNorm, isLandmark){
         const width = isLandmark ? randRange(4.2,5.5) : randRange(1.2,3.5);
-        const heightBase = isLandmark ? randRange(15000,25000) : randRange(5000,14000);
-        const speedBoost = 1 + progress * 0.6;
-        const height = heightBase * speedBoost;
+        const heightBase = isLandmark ? randRange(15000, 25000) : randRange(4000, 12000);
+        const height = heightBase;
         const buffer = 0.2 + Math.random()*0.25;
         const x = side * (roadEdgeNorm + buffer + width/2);
         const type = isLandmark ? ['mega','tower','gate'][Math.floor(Math.random()*3)] : 'normal';
-        return { x, w: width, h: height, c: Math.random(), type, seed: Math.random() };
+        return { x, w: width, h: height, c: Math.random(), type };
     }
 
     let lastTime = 0;
     function gameLoop(time) {
         if (game.state === STATE.MENU && lastTime === 0) { lastTime=time; requestAnimationFrame(gameLoop); return; }
-        if (game.state === STATE.MENU) return; // 暂停
-
         const dt = Math.min(0.1, (time - lastTime) / 1000);
         lastTime = time;
-
-        update(dt);
-        render();
-
+        if (game.state !== STATE.MENU) {
+            update(dt);
+            render();
+        }
         requestAnimationFrame(gameLoop);
     }
 
-    // --- 辅助：查找当前片段 ---
     function findSegment(z) {
-        return game.segments[Math.floor(z / CONFIG.segL) % game.segments.length];
+        const index = Math.floor(z / CONFIG.segL) - game.segmentOffsetIndex;
+        return game.segments[Math.max(0, Math.min(index, game.segments.length - 1))];
     }
 
-    // --- 核心更新逻辑 ---
     function update(dt) {
         const p = game.player;
-        const maxS = (game.state === STATE.RUSH) ? CONFIG.rushSpeed : CONFIG.maxSpeed;
 
-        // 加速逻辑
-        p.speed += CONFIG.accel * (game.state === STATE.RUSH ? 12 : 1);
-        if (p.speed > maxS) p.speed = maxS;
+        if (game.state === STATE.PLAY || game.state === STATE.RUSH) {
+            const maxS = (game.state === STATE.RUSH) ? CONFIG.rushSpeed : CONFIG.maxSpeed;
+            const accelMult = game.keys.up ? 1.5 : 1.0;
+            p.speed += CONFIG.accel * accelMult * (game.state === STATE.RUSH ? 12 : 1);
+            if (p.speed > maxS) p.speed = maxS;
 
-        // 移动
-        p.z += p.speed * dt;
+            p.z += p.speed * dt;
 
-        // --- 需求3核心：坡道贴合计算 ---
-        // 计算玩家当前在哪个片段上，以及在这个片段的百分比位置
-        const currentSeg = findSegment(p.z);
-        const currentPercent = (p.z % CONFIG.segL) / CONFIG.segL;
-        // 线性插值计算当前路面高度 (Y)
-        const playerTrackY = currentSeg.p1.world.y + (currentSeg.p2.world.y - currentSeg.p1.world.y) * currentPercent;
-        // 相机高度 = 赛道高度 + 悬挂高度
-        // 通过简单的 lerp 稍微平滑一下相机的垂直运动（防止突变）
-        const targetCamY = playerTrackY + CONFIG.camH;
-        game.cam.y = targetCamY; // 简单起见直接赋值，也可以用 lerp(game.cam.y, targetCamY, dt*10) 做阻尼
-        // ---------------------------
+            const currentIdx = Math.floor(p.z / CONFIG.segL);
+            if ((currentIdx - game.segmentOffsetIndex) > game.segments.length - 300) { extendTrack(200); }
+            if ((currentIdx - game.segmentOffsetIndex) > 200) {
+                const removeCount = (currentIdx - game.segmentOffsetIndex) - 200;
+                game.segments.splice(0, removeCount);
+                game.segmentOffsetIndex += removeCount;
+            }
 
-        let speedRatio = (p.speed / CONFIG.maxSpeed);
-        let dx = dt * (3.5 * speedRatio + 1.2);
-        if (game.state === STATE.RUSH) dx *= 1.5;
+            const currentSeg = findSegment(p.z);
+            const pct = (p.z % CONFIG.segL) / CONFIG.segL;
+            const trackY = currentSeg.p1.world.y + (currentSeg.p2.world.y - currentSeg.p1.world.y) * pct;
+            game.cam.y = trackY + CONFIG.camH;
 
-        if (game.keys.left) p.x -= dx;
-        if (game.keys.right) p.x += dx;
+            let speedRatio = (p.speed / CONFIG.maxSpeed);
+            let steerPower = dt * (speedRatio + 0.5) * CONFIG.steerSens;
+            if (game.state === STATE.RUSH) steerPower *= 1.5;
 
-        // 离心力
-        p.x -= (dx * speedRatio * currentSeg.curve * CONFIG.centrifugal);
+            if (game.keys.left) p.x -= steerPower;
+            if (game.keys.right) p.x += steerPower;
 
-        // 边界限制
-        const currentRoadLimit = (CONFIG.roadW / CONFIG.laneW) * SETTINGS.roadWidthScale - 0.1;
-        if (p.x < -currentRoadLimit) { p.x = -currentRoadLimit; if(p.speed>8000) p.speed-=200; }
-        if (p.x > currentRoadLimit) { p.x = currentRoadLimit; if(p.speed>8000) p.speed-=200; }
+            p.x -= (currentSeg.curve * speedRatio * CONFIG.centrifugal) * dt;
 
-        // 碰撞检测
-        game.cars.forEach(car => {
-            car.z += car.speed * dt;
-            // 简单的 Z 轴重置，循环利用
-            if (car.z > p.z + CONFIG.drawDist * CONFIG.segL) car.z -= game.segments.length * CONFIG.segL;
-            if (car.z < p.z - 2000) car.z += game.segments.length * CONFIG.segL;
+            const currentRoadLimit = (CONFIG.roadW / CONFIG.laneW) * SETTINGS.roadWidthScale - 0.1;
+            if (p.x < -currentRoadLimit) { p.x = -currentRoadLimit; if(p.speed>8000) p.speed-=200; }
+            if (p.x > currentRoadLimit) { p.x = currentRoadLimit; if(p.speed>8000) p.speed-=200; }
 
-            if (Math.abs(car.z - p.z) < 300 && Math.abs(car.x - p.x) < 0.7) handleCollision(car, 'car', currentSeg);
-        });
+            game.cars.forEach(car => {
+                car.z += car.speed * dt;
+                if (car.z < p.z - 2000) car.z = p.z + CONFIG.drawDist * CONFIG.segL * (0.8 + Math.random()*0.4);
+                if (Math.abs(car.z - p.z) < 300 && Math.abs(car.x - p.x) < 0.7) handleCollision(car, 'car', currentSeg);
+            });
+            currentSeg.sprites.forEach((s, i) => { if (Math.abs(p.x - s.x) < 0.7) handleCollision(s, 'obs', currentSeg); });
 
-        currentSeg.sprites.forEach((s, i) => {
-            if (Math.abs(p.x - s.x) < 0.7) { handleCollision(s, 'obs', currentSeg); }
-        });
+            if (game.state === STATE.RUSH) { p.rage -= dt * 20; p.score += 2000 * dt; if (p.rage <= 0) exitRushMode(); }
+            else { p.rage = Math.max(0, p.rage - dt * CONFIG.rageDrain); if (p.rage >= 100) enterRushMode(); }
 
-        // 移除失效对象
-        game.cars = game.cars.filter(c => c.active !== false);
-        game.segments.forEach(seg => {
-            seg.sprites = seg.sprites.filter(s => s.active !== false);
-        });
+            if (game.cam.shake > 0) game.cam.shake = Math.max(0, game.cam.shake - dt * 100);
 
-        // 游戏状态逻辑
-        if (game.state === STATE.RUSH) {
-            p.rage -= dt * 20;
-            p.score += 2000 * dt;
-            if (p.rage <= 0) exitRushMode();
-        } else {
-            p.rage = Math.max(0, p.rage - dt * CONFIG.rageDrain);
-            if (p.rage >= 100) enterRushMode();
+            const targetFov = CONFIG.baseCamD - (speedRatio * 0.3) - (game.keys.up ? 0.05 : 0);
+            game.cam.fovOffset += (targetFov - game.cam.fovOffset) * dt * 2;
+
+            updateAudio(dt);
         }
-
-        if (game.cam.shake > 0) game.cam.shake = Math.max(0, game.cam.shake - dt * 100);
 
         speedTier = getSpeedTier(p.speed);
         updateUI();
         updateParticles(dt);
     }
 
-    function getSpeedTier(v){
-        if (v > 10000) return 3;
-        if (v > 7000) return 2;
-        if (v > 4000) return 1;
-        return 0;
-    }
+    function getSpeedTier(v){ if (v > 10000) return 3; if (v > 7000) return 2; if (v > 4000) return 1; return 0; }
 
     function handleCollision(target, type, segRef) {
-        const p = game.player;
         const isRush = game.state === STATE.RUSH;
-
         game.cam.shake = isRush ? 15 : 30;
-        target.active = false; // 标记删除
-
-        if(type === 'car') target.z = -99999; // 移出视野
-
+        target.active = false;
+        if(type === 'car') target.z = -99999;
         const hitPos = screenPosFromTarget(target, segRef);
         spawnExplosion(hitPos.x, hitPos.y, 50, isRush ? '#0ff' : (type==='obs'?'#fa0':'#f00'));
-        spawnSmoke(hitPos.x, hitPos.y, 40);
         playExplosionSound(isRush ? 0.8 : 1.2);
-
-        if (isRush) {
-            p.score += 5000; p.kills++; showMsg("DESTROYED", "+5000");
-        } else {
-            p.speed *= 0.6;
-            game.player.rage += CONFIG.ragePerHit;
-            showMsg("IMPACT", "SPEED LOST");
-        }
+        if (isRush) { game.player.score += 5000; game.player.kills++; showMsg("车辆摧毁", "+5000分"); } // 汉化
+        else { game.player.speed *= 0.6; game.player.rage += CONFIG.ragePerHit; showMsg("严重碰撞", "速度损失"); } // 汉化
     }
 
-    function enterRushMode() {
-        game.state = STATE.RUSH;
-        document.getElementById('game-container').classList.add('rush-active');
-        document.getElementById('rage-container').classList.add('full');
-        showMsg("HYPER DRIVE", "ENGAGED");
-    }
+    function enterRushMode() { game.state = STATE.RUSH; document.getElementById('game-container').classList.add('rush-active'); document.getElementById('rage-container').classList.add('full'); showMsg("极速模式", "怒气爆发"); } // 汉化
+    function exitRushMode() { game.state = STATE.PLAY; game.player.rage = 0; document.getElementById('game-container').classList.remove('rush-active'); document.getElementById('rage-container').classList.remove('full'); }
 
-    function exitRushMode() {
-        game.state = STATE.PLAY;
-        game.player.rage = 0;
-        document.getElementById('game-container').classList.remove('rush-active');
-        document.getElementById('rage-container').classList.remove('full');
-    }
+    function updateParticles(dt) { for(let i=game.particles.length-1; i>=0; i--) { let pt = game.particles[i]; pt.x += pt.vx; pt.y += pt.vy; pt.life -= dt; pt.vy += 5*dt; if(pt.life <= 0) game.particles.splice(i,1); } }
+    function renderParticles() { game.particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); }); ctx.globalAlpha = 1; }
+    function spawnExplosion(x,y,n,c) { for(let i=0;i<n;i++) { const a = Math.random()*6.28, s = Math.random()*15+5; game.particles.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:Math.random(),color:c,size:Math.random()*6+2}); } }
 
-    // --- 粒子系统 ---
-    function updateParticles(dt) {
-        for(let i=game.particles.length-1; i>=0; i--) {
-            let pt = game.particles[i];
-            pt.x += pt.vx; pt.y += pt.vy;
-            pt.life -= dt;
-            pt.vy += 5*dt; // 重力
-            if(pt.life <= 0) game.particles.splice(i,1);
-        }
-    }
-
-    function renderParticles() {
-        game.particles.forEach(p => {
-            ctx.fillStyle = p.color;
-            ctx.globalAlpha = p.life;
-            ctx.fillRect(p.x, p.y, p.size, p.size);
-        });
-        ctx.globalAlpha = 1;
-    }
-
-    function spawnExplosion(x,y,n,c) {
-        for(let i=0;i<n;i++) {
-            const a = Math.random()*6.28, s = Math.random()*15+5;
-            game.particles.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:Math.random(),color:c,size:Math.random()*6+2});
-        }
-    }
-
-    function spawnSmoke(x,y,n){
-        for(let i=0;i<n;i++){
-            const a = Math.random()*6.28, s = Math.random()*8;
-            game.particles.push({x:x,y:y,vx:Math.cos(a)*s*0.5,vy:Math.sin(a)*s*0.5 - 2,life:0.8+Math.random()*0.6,color:'rgba(80,80,80,0.8)',size:Math.random()*10+6});
-        }
-    }
-
-    // --- 视觉特效 ---
-    function drawSpeedFX(tier){
-        if(tier<=0) return;
-        const lines = 25 * tier;
+    function drawSpeedLines(){
+        const speed = game.player.speed;
+        if(speed < 5000 && !game.keys.up) return;
+        const intensity = Math.min(1, speed / CONFIG.maxSpeed) + (game.keys.up ? 0.2 : 0);
+        const count = Math.floor(20 + intensity * 60);
         ctx.save();
-        ctx.globalAlpha = 0.12 + tier*0.05;
-        ctx.strokeStyle = 'rgba(0,255,255,0.6)';
-        ctx.lineWidth = 2 + tier;
-
-        for(let i=0;i<lines;i++){
-            const ang = Math.random()*Math.PI*2;
-            const len = 80 + Math.random()*120 + tier*40;
-            const r = Math.random()*Math.min(W,H)*0.6 + Math.min(W,H)*0.25;
-            const x = W/2 + Math.cos(ang)*r;
-            const y = H/2 + Math.sin(ang)*r;
-            ctx.beginPath();
-            ctx.moveTo(x,y);
-            ctx.lineTo(x - Math.cos(ang)*len, y - Math.sin(ang)*len);
-            ctx.stroke();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(0, 255, 255, ${0.1 + intensity * 0.4})`;
+        ctx.lineWidth = 2 + intensity * 2;
+        const cx = W/2, cy = H/2;
+        ctx.beginPath();
+        for(let i=0; i<count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 50 + Math.random() * 200;
+            const len = 50 + Math.random() * 400 * (1 + intensity * 2);
+            ctx.moveTo(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist);
+            ctx.lineTo(cx + Math.cos(angle) * (dist+len), cy + Math.sin(angle) * (dist+len));
         }
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -600,10 +462,9 @@
         const wz = target.z || (seg ? seg.p1.world.z : game.player.z);
         const wy = seg ? seg.p1.world.y : 0;
         const offsetZ = wz - game.player.z;
-
-        // 临时的投影对象
+        const currentCamD = game.cam.fovOffset || CONFIG.baseCamD;
         const temp = { world:{ y: wy, z: wz }, camera:{}, screen:{} };
-        project(temp, (target.x||0)* laneW, offsetZ);
+        project(temp, (target.x||0)* laneW, offsetZ, currentCamD);
         return { x: temp.screen.x, y: temp.screen.y };
     }
 
@@ -612,333 +473,195 @@
         document.getElementById('speed-val').innerText = Math.floor(game.player.speed/100);
         document.getElementById('kill-val').innerText = game.player.kills;
         document.getElementById('rage-fill').style.width = game.player.rage + '%';
+        if(game.player.speed > 8000) { const r = Math.random()*2-1; document.getElementById('speed-val').style.transform = `skew(-10deg) translate(${r}px, ${r}px)`; }
     }
 
-    function showMsg(m,s,t=1000) {
-        const el = document.getElementById('center-msg');
-        el.innerHTML = `<div class="msg-big">${m}</div><div class="msg-sub">${s}</div>`;
-        el.style.display = 'block';
-        clearTimeout(game.msgTimer);
-        game.msgTimer = setTimeout(()=>el.style.display='none', t);
-    }
+    function showMsg(m,s,t=1000) { const el = document.getElementById('center-msg'); el.innerHTML = `<div class="msg-big">${m}</div><div class="msg-sub">${s}</div>`; el.style.display = 'block'; clearTimeout(game.msgTimer); game.msgTimer = setTimeout(()=>el.style.display='none', t); }
 
-    // --- 渲染逻辑 ---
     function render() {
         ctx.fillStyle = game.state === STATE.RUSH ? '#100' : CONFIG.colors.sky;
         ctx.fillRect(0,0,W,H);
-
-        drawSpeedFX(speedTier);
-
+        drawSpeedLines();
         let sx = (Math.random()-0.5)*game.cam.shake;
         let sy = (Math.random()-0.5)*game.cam.shake;
-
-        ctx.save();
-        ctx.translate(sx, sy);
-
-        const baseIdx = Math.floor(game.player.z/CONFIG.segL);
+        ctx.save(); ctx.translate(sx, sy);
+        const baseIdx = Math.floor(game.player.z/CONFIG.segL) - game.segmentOffsetIndex;
         let maxY = H;
+        const currentCamD = game.cam.fovOffset || CONFIG.baseCamD;
 
         for(let n=0; n<CONFIG.drawDist; n++) {
-            const segment = game.segments[(baseIdx + n) % game.segments.length];
-            const loopedIdx = (segment.index < baseIdx) ? segment.index + game.segments.length : segment.index;
-            const offsetZ = (loopedIdx * CONFIG.segL) - game.player.z;
-
-            if(offsetZ < CONFIG.camD) continue;
-
-            const currentLaneW = CONFIG.laneW * SETTINGS.roadWidthScale;
-
-            project(segment.p1, game.player.x * currentLaneW, offsetZ);
-            project(segment.p2, game.player.x * currentLaneW - (segment.curve * (offsetZ/CONFIG.segL)), offsetZ+CONFIG.segL);
-
+            const idx = baseIdx + n;
+            if(idx >= game.segments.length || idx < 0) continue;
+            const segment = game.segments[idx];
+            const offsetZ = (segment.index * CONFIG.segL) - game.player.z;
+            if(offsetZ < 1) continue;
+            project(segment.p1, game.player.x * CONFIG.laneW, offsetZ, currentCamD);
+            project(segment.p2, game.player.x * CONFIG.laneW - (segment.curve * (offsetZ/CONFIG.segL)), offsetZ+CONFIG.segL, currentCamD);
             if(segment.p1.screen.y >= maxY) continue;
-
             renderRoad(segment);
             maxY = segment.p1.screen.y;
         }
-
         for(let n=CONFIG.drawDist-1; n>0; n--) {
-            const segment = game.segments[(baseIdx + n) % game.segments.length];
+            const idx = baseIdx + n;
+            if(idx >= game.segments.length || idx < 0) continue;
+            const segment = game.segments[idx];
             const currentLaneW = CONFIG.laneW * SETTINGS.roadWidthScale;
-
             segment.buildings.forEach(b => renderBuilding3D(segment, b, currentLaneW));
-
-            game.cars.forEach(car => {
-                if(car.z >= segment.p1.world.z && car.z < segment.p2.world.z) {
-                    const pct = (car.z - segment.p1.world.z) / CONFIG.segL;
-                    renderCarModel(segment, car, currentLaneW, pct);
-                }
-            });
-
-            segment.sprites.forEach(s => {
-                renderObstacleModel(segment, s, currentLaneW, 0);
-            });
+            game.cars.forEach(car => { if(car.z >= segment.p1.world.z && car.z < segment.p2.world.z) { const pct = (car.z - segment.p1.world.z) / CONFIG.segL; renderCarModel(segment, car, currentLaneW, pct); } });
+            segment.sprites.forEach(s => { renderObstacleModel(segment, s, currentLaneW, 0); });
         }
-
         renderPlayer();
         renderParticles();
-
         ctx.restore();
     }
 
-    // --- 投影函数 (Modified for Terrain Following) ---
-    function project(p, cx, cz) {
-        p.camera.x = p.world.x || 0;
-        // 关键修复：世界坐标 Y - 相机实时高度 Y
+    function project(p, cx, cz, fov) {
         p.camera.y = (p.world.y || 0) - game.cam.y;
-        p.camera.z = cz;
-
-        p.screen.scale = CONFIG.camD / cz;
+        p.screen.scale = fov / cz;
         p.screen.x = Math.round((W/2) + (p.screen.scale * (-cx) * W/2));
-        p.screen.y = Math.round((H*0.5) - (p.screen.scale * p.camera.y * H/2)); // 屏幕中心 H*0.5 是视平线
+        p.screen.y = Math.round((H*0.5) - (p.screen.scale * p.camera.y * H/2));
         p.screen.w = Math.round(p.screen.scale * CONFIG.roadW * SETTINGS.roadWidthScale * W/2);
     }
 
     function renderRoad(s) {
         const p1=s.p1.screen, p2=s.p2.screen;
         const col = game.state===STATE.RUSH ? (Math.floor(s.index/2)%2?'#f0f':'#0ff') : s.color;
-
-        // 地板 (Grass)
         ctx.fillStyle = game.state===STATE.RUSH?'#000':(Math.floor(s.index/5)%2?CONFIG.colors.grassDark:CONFIG.colors.grassLight);
         ctx.fillRect(0, p2.y, W, p1.y-p2.y);
-
-        // 路面
         ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.moveTo(p1.x-p1.w, p1.y); ctx.lineTo(p1.x+p1.w, p1.y);
-        ctx.lineTo(p2.x+p2.w, p2.y); ctx.lineTo(p2.x-p2.w, p2.y);
-        ctx.fill();
-
-        // 标线
-        ctx.fillStyle = '#fff';
-        const mw = p1.w * 0.05;
-        ctx.fillRect(p1.x-p1.w-mw, p1.y, mw, p1.y-p2.y);
-        ctx.fillRect(p1.x+p1.w, p1.y, mw, p1.y-p2.y);
+        ctx.beginPath(); ctx.moveTo(p1.x-p1.w, p1.y); ctx.lineTo(p1.x+p1.w, p1.y); ctx.lineTo(p2.x+p2.w, p2.y); ctx.lineTo(p2.x-p2.w, p2.y); ctx.fill();
+        ctx.fillStyle = '#fff'; const mw = p1.w * 0.05; ctx.fillRect(p1.x-p1.w-mw, p1.y, mw, p1.y-p2.y); ctx.fillRect(p1.x+p1.w, p1.y, mw, p1.y-p2.y);
     }
 
     function renderBuilding3D(s, b, laneW) {
         const scale = s.p1.screen.scale;
         const screenX = s.p1.screen.x + (scale * b.x * laneW * W / 2);
         const screenY = s.p1.screen.y;
-
         const buildW = b.w * laneW * scale * W / 2;
         const buildH = b.h * scale * H / 2;
-
         if (buildW < 2 || buildH < 2) return;
         if (screenX + buildW < 0 || screenX - buildW > W) return;
 
         const palette = PALETTES[Math.floor((b.c || 0) * PALETTES.length) % PALETTES.length];
-
-        ctx.save();
-        ctx.translate(screenX, screenY);
-
+        ctx.save(); ctx.translate(screenX, screenY);
         const hue = Math.floor(b.c * 360);
         const grd = ctx.createLinearGradient(0, -buildH, 0, 0);
         grd.addColorStop(0, `hsla(${hue}, 100%, 70%, 1)`);
         grd.addColorStop(0.3, `hsla(${hue}, 60%, 20%, 1)`);
         grd.addColorStop(1, '#000');
-
-        ctx.fillStyle = grd;
-        ctx.fillRect(-buildW/2, -buildH, buildW, buildH);
-
-        ctx.strokeStyle = `hsla(${hue}, 100%, 50%, 0.8)`;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-buildW/2, -buildH, buildW, buildH);
-
-        if (b.type === 'tower') {
-            ctx.fillStyle = `hsla(${hue},100%,80%,1)`;
-            ctx.fillRect(-2, -buildH-10, 4, 10);
-        }
-
+        ctx.fillStyle = grd; ctx.fillRect(-buildW/2, -buildH, buildW, buildH);
+        ctx.strokeStyle = `hsla(${hue}, 100%, 50%, 0.8)`; ctx.lineWidth = 1; ctx.strokeRect(-buildW/2, -buildH, buildW, buildH);
+        if (b.type === 'tower') { ctx.fillStyle = `hsla(${hue},100%,80%,1)`; ctx.fillRect(-2, -buildH-10, 4, 10); }
         ctx.restore();
     }
 
     function renderCarModel(s, car, laneW, pct) {
         const p1 = s.p1.screen, p2 = s.p2.screen;
+        if (!p1 || !p2 || p1.scale <= 0) return; // 安全检查
+
         const scale = p1.scale + (p2.scale - p1.scale) * pct;
+        if (scale <= 0) return; // 再次检查防止负值
+
         const sx = p1.x + (p2.x - p1.x) * pct + (scale * car.x * laneW * W / 2);
         const sy = p1.y + (p2.y - p1.y) * pct;
-
         const style = CAR_STYLES[car.style] || CAR_STYLES['sedan'];
         const w = style.w * scale * W / 2;
         const h = style.h * scale * H / 2;
 
-        ctx.save();
-        ctx.translate(sx, sy);
+        // 尺寸检查，防止负数半径
+        if (w < 1 || h < 1) return;
 
-        // 阴影
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(-w/2 - w*0.1, 0, w*1.2, h*0.15);
-
-        // 视差侧面 (Parallax)
-        const parallax = (sx - W/2) / (W/2);
-        const depth = w * 0.4;
+        ctx.save(); ctx.translate(sx, sy);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-w/2 - w*0.1, 0, w*1.2, h*0.15);
+        const parallax = (sx - W/2) / (W/2); const depth = w * 0.4;
         ctx.fillStyle = '#111';
-        if (Math.abs(parallax) > 0.1) {
-            ctx.beginPath();
-            if (parallax > 0) { ctx.moveTo(-w/2, -h); ctx.lineTo(-w/2, 0); ctx.lineTo(-w/2 - depth*parallax, -h*0.2); ctx.lineTo(-w/2 - depth*parallax, -h*0.8); }
-            else { ctx.moveTo(w/2, -h); ctx.lineTo(w/2, 0); ctx.lineTo(w/2 - depth*parallax, -h*0.2); ctx.lineTo(w/2 - depth*parallax, -h*0.8); }
-            ctx.fill();
-        }
-
-        // 车身
-        const colVar = car.colorVar > 0.5 ? '#444' : style.color;
-        ctx.fillStyle = colVar;
+        if (Math.abs(parallax) > 0.1) { ctx.beginPath(); if (parallax > 0) { ctx.moveTo(-w/2, -h); ctx.lineTo(-w/2, 0); ctx.lineTo(-w/2 - depth*parallax, -h*0.2); ctx.lineTo(-w/2 - depth*parallax, -h*0.8); } else { ctx.moveTo(w/2, -h); ctx.lineTo(w/2, 0); ctx.lineTo(w/2 - depth*parallax, -h*0.2); ctx.lineTo(w/2 - depth*parallax, -h*0.8); } ctx.fill(); }
+        const colVar = car.colorVar > 0.5 ? '#444' : style.color; ctx.fillStyle = colVar;
         if (car.style === 'truck') { ctx.fillRect(-w/2, -h, w, h); ctx.fillStyle = '#000'; ctx.fillRect(-w/2+5, -h+10, w-10, h/2); }
         else if (car.style === 'racer') { ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(-w/3, -h); ctx.fill(); }
         else { ctx.fillRect(-w/2, -h*0.6, w, h*0.6); ctx.fillRect(-w/3, -h, w*0.66, h*0.4); }
-
-        // 尾灯
-        ctx.shadowBlur = 10 * scale * 20;
-        ctx.shadowColor = '#f00';
-        ctx.fillStyle = '#f00';
+        ctx.shadowBlur = 10 * scale * 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00';
         if (style.lights === 'v-side') { ctx.fillRect(-w/2 + 2, -h + 10, w*0.1, h*0.8); ctx.fillRect(w/2 - w*0.1 - 2, -h + 10, w*0.1, h*0.8); }
-        else if (style.lights === 'quad') { ctx.beginPath(); ctx.arc(-w/3, -h/3, h/6, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(w/3, -h/3, h/6, 0, Math.PI*2); ctx.fill(); }
+        else if (style.lights === 'quad') {
+            const r = h/6;
+            ctx.beginPath(); ctx.arc(-w/3, -h/3, r, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w/3, -h/3, r, 0, Math.PI*2); ctx.fill();
+        }
         else { ctx.fillRect(-w/2 + 5, -h/2, w-10, h/5); }
         ctx.shadowBlur = 0;
-
-        // --- 需求1：Hitbox 开关控制 ---
-        if (SETTINGS.showHitboxes) {
-            const hitLimit = 0.7;
-            const hitScreenW = hitLimit * laneW * scale * W / 2;
-            ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
-            ctx.strokeRect(-hitScreenW, -h*1.2, hitScreenW*2, h*1.4);
-            ctx.fillStyle = '#fff'; ctx.fillRect(-2, -2, 4, 4);
-            ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
-            const distZ = Math.floor(car.z - game.player.z);
-            ctx.fillText(`Z:${distZ}`, -hitScreenW, -h*1.3);
-        }
-
+        if (SETTINGS.showHitboxes) { const hitLimit = 0.7; const hitScreenW = hitLimit * laneW * scale * W / 2; ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(-hitScreenW, -h*1.2, hitScreenW*2, h*1.4); }
         ctx.restore();
     }
 
     function renderObstacleModel(s, obj, laneW, pct) {
-        const p1 = s.p1.screen;
-        const scale = p1.scale;
-        const sx = p1.x + (scale * obj.x * laneW * W / 2);
-        const sy = p1.y;
-
+        const p1 = s.p1.screen; const scale = p1.scale;
+        const sx = p1.x + (scale * obj.x * laneW * W / 2); const sy = p1.y;
         const style = OBS_STYLES[obj.style] || OBS_STYLES['crate'];
-        const sizeMult = obj.size || 1;
-        const w = style.w * scale * W / 2 * sizeMult;
-        const h = style.h * scale * H / 2 * sizeMult;
-
+        const sizeMult = obj.size || 1; const w = style.w * scale * W / 2 * sizeMult; const h = style.h * scale * H / 2 * sizeMult;
         if (w < 2) return;
-
-        ctx.save();
-        ctx.translate(sx, sy);
-
-        const parallax = (sx - W/2) / (W/2);
-        const depthX = parallax * w * 0.5;
-        const topY = -h * 0.8;
-
-        if (style.type === 'box') {
-            ctx.fillStyle = style.color; ctx.fillRect(-w/2, -h, w, h);
-            ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.moveTo(-w/2, -h); ctx.lineTo(w/2, -h); ctx.lineTo(w/2 + depthX, -h + topY); ctx.lineTo(-w/2 + depthX, -h + topY); ctx.fill();
-            ctx.fillStyle = '#aa4400'; ctx.beginPath();
-            if (parallax > 0) { ctx.moveTo(-w/2, -h); ctx.lineTo(-w/2, 0); ctx.lineTo(-w/2 + depthX, topY); ctx.lineTo(-w/2 + depthX, -h + topY); }
-            else { ctx.moveTo(w/2, -h); ctx.lineTo(w/2, 0); ctx.lineTo(w/2 + depthX, topY); ctx.lineTo(w/2 + depthX, -h + topY); }
-            ctx.fill();
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-w/2, -h); ctx.lineTo(w/2, 0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w/2, -h); ctx.lineTo(-w/2, 0); ctx.stroke();
-        } else if (style.type === 'trap') {
-            ctx.fillStyle = '#888'; ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(-w/3, -h); ctx.fill();
-            ctx.fillStyle = '#555'; ctx.beginPath();
-            if(parallax > 0) { ctx.moveTo(-w/2, 0); ctx.lineTo(-w/3, -h); ctx.lineTo(-w/3+depthX, -h-20); ctx.lineTo(-w/2+depthX, -20); }
-            else { ctx.moveTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(w/3+depthX, -h-20); ctx.lineTo(w/2+depthX, -20); }
-            ctx.fill();
-        } else {
-            ctx.shadowBlur = 20; ctx.shadowColor = style.color; ctx.fillStyle = style.color;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w/2, -h/2); ctx.lineTo(0, -h); ctx.lineTo(-w/2, -h/2); ctx.fill();
-            ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(10, -h/2); ctx.lineTo(0, 0); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-        }
-
-        // --- 需求1：Hitbox 开关控制 ---
-        if (SETTINGS.showHitboxes) {
-            const hitLimit = 0.7;
-            const hitScreenW = hitLimit * laneW * scale * W / 2;
-            ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
-            ctx.strokeRect(-hitScreenW, -h*1.2, hitScreenW*2, h*1.4);
-            ctx.fillStyle = '#fff'; ctx.fillRect(-2, -2, 4, 4);
-        }
-
+        ctx.save(); ctx.translate(sx, sy);
+        const parallax = (sx - W/2) / (W/2); const depthX = parallax * w * 0.5; const topY = -h * 0.8;
+        if (style.type === 'box') { ctx.fillStyle = style.color; ctx.fillRect(-w/2, -h, w, h); ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.moveTo(-w/2, -h); ctx.lineTo(w/2, -h); ctx.lineTo(w/2 + depthX, -h + topY); ctx.lineTo(-w/2 + depthX, -h + topY); ctx.fill(); ctx.fillStyle = '#aa4400'; ctx.beginPath(); if (parallax > 0) { ctx.moveTo(-w/2, -h); ctx.lineTo(-w/2, 0); ctx.lineTo(-w/2 + depthX, topY); ctx.lineTo(-w/2 + depthX, -h + topY); } else { ctx.moveTo(w/2, -h); ctx.lineTo(w/2, 0); ctx.lineTo(w/2 + depthX, topY); ctx.lineTo(w/2 + depthX, -h + topY); } ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-w/2, -h); ctx.lineTo(w/2, 0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w/2, -h); ctx.lineTo(-w/2, 0); ctx.stroke(); }
+        else if (style.type === 'trap') { ctx.fillStyle = '#888'; ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(-w/3, -h); ctx.fill(); ctx.fillStyle = '#555'; ctx.beginPath(); if(parallax > 0) { ctx.moveTo(-w/2, 0); ctx.lineTo(-w/3, -h); ctx.lineTo(-w/3+depthX, -h-20); ctx.lineTo(-w/2+depthX, -20); } else { ctx.moveTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(w/3+depthX, -h-20); ctx.lineTo(w/2+depthX, -20); } ctx.fill(); }
+        else { ctx.shadowBlur = 20; ctx.shadowColor = style.color; ctx.fillStyle = style.color; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w/2, -h/2); ctx.lineTo(0, -h); ctx.lineTo(-w/2, -h/2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(10, -h/2); ctx.lineTo(0, 0); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
+        if (SETTINGS.showHitboxes) { const hitLimit = 0.7; const hitScreenW = hitLimit * laneW * scale * W / 2; ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(-hitScreenW, -h*1.2, hitScreenW*2, h*1.4); }
         ctx.restore();
     }
 
-    // --- 玩家渲染 ---
     function renderPlayer() {
-        // --- 需求2：调整相机距离感 ---
-        // 原来是 H-80，现在略微上移一点点来配合更远的 camD，或者保持不变
-        // 由于调整了 camD，FOV 变大了，为了让车子不显得太小，我们稍微加大车宽，但位置保持在底部
         const carW = 240, carH = 110;
-        const x = W/2, y = H - 60;
-
+        const bounce = (game.player.speed > 5000) ? Math.random()*2 : 0;
+        const x = W/2, y = H - 60 + bounce;
         ctx.save(); ctx.translate(x, y);
-
-        // 倾斜动画
         let tilt = game.keys.left ? -0.05 : (game.keys.right ? 0.05 : 0);
-
-        // 坡度反馈：虽然是2.5D，但根据当前路面斜率稍微改变车的绘制角度（Pitch）能增加真实感
-        // 这里简单模拟：如果路在上升，车头抬起（Y缩放）
-
         ctx.rotate(tilt);
-
         ctx.fillStyle = '#111'; ctx.fillRect(-carW/2, -carH, carW, carH);
         ctx.fillStyle = '#222'; ctx.beginPath(); ctx.moveTo(-carW/2 + 20, -carH); ctx.lineTo(carW/2 - 20, -carH); ctx.lineTo(carW/2 - 40, -carH - 40); ctx.lineTo(-carW/2 + 40, -carH - 40); ctx.fill();
-
         const lightW = 40, lightH = 20;
         ctx.shadowBlur = 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00';
         ctx.fillRect(-carW/2 + 10, -carH + 20, lightW, lightH); ctx.fillRect(carW/2 - 10 - lightW, -carH + 20, lightW, lightH);
-
-        if(game.player.speed > 5000) {
+        if(game.keys.up || game.state === STATE.RUSH) {
             ctx.shadowColor = '#0ff'; ctx.fillStyle = '#0ff';
-            const h = (game.player.speed / CONFIG.maxSpeed) * 60;
-            ctx.globalAlpha = 0.6;
-            ctx.fillRect(-20, -10, 10, h);
-            ctx.fillRect(10, -10, 10, h);
+            const h = 20 + Math.random() * 40;
+            ctx.fillRect(-30, -10, 15, h); ctx.fillRect(15, -10, 15, h);
         }
-
-        // --- 需求1：Player Hitbox 开关 ---
-        if (SETTINGS.showHitboxes) {
-            ctx.shadowBlur = 0; ctx.strokeStyle = '#ff0';
-            ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke();
-            ctx.strokeRect(-carW/2, -carH-40, carW, carH+40);
-        }
-
+        if(SETTINGS.showHitboxes) { ctx.shadowBlur = 0; ctx.strokeStyle = '#ff0'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke(); ctx.strokeRect(-carW/2, -carH-40, carW, carH+40); }
         ctx.restore();
     }
 
     function initAudio() {
         const AC = window.AudioContext || window.webkitAudioContext;
-        game.audio = new AC();
-        const osc = game.audio.createOscillator();
-        const gain = game.audio.createGain();
-        osc.type = 'sawtooth'; osc.frequency.value=50; gain.gain.value=0.1;
-        osc.connect(gain); gain.connect(game.audio.destination); osc.start();
-
-        setInterval(()=>{
-            const freq = 50 + (game.player.speed/CONFIG.maxSpeed)*200;
-            osc.frequency.setTargetAtTime(freq, game.audio.currentTime, 0.1);
-            gain.gain.value = (game.state===STATE.MENU)?0:0.1;
-        }, 100);
+        game.audio.ctx = new AC();
+        const ctxA = game.audio.ctx;
+        game.audio.osc = ctxA.createOscillator(); game.audio.osc.type = 'sawtooth';
+        game.audio.gain = ctxA.createGain(); game.audio.gain.gain.value = 0;
+        game.audio.osc.connect(game.audio.gain).connect(ctxA.destination);
+        game.audio.osc.start();
+        const bSize = ctxA.sampleRate * 2;
+        const b = ctxA.createBuffer(1, bSize, ctxA.sampleRate);
+        const d = b.getChannelData(0);
+        for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+        game.audio.noise = ctxA.createBufferSource();
+        game.audio.noise.buffer = b;
+        game.audio.noise.loop = true;
+        game.audio.noiseGain = ctxA.createGain();
+        game.audio.noiseGain.gain.value = 0;
+        game.audio.noise.connect(game.audio.noiseGain).connect(ctxA.destination);
+        game.audio.noise.start();
     }
 
-    function playExplosionSound(intensity=1){
-        try{
-            if(!game.audio) return;
-            const ctxA = game.audio;
-            const buffer = ctxA.createBuffer(1, ctxA.sampleRate*0.25, ctxA.sampleRate);
-            const data = buffer.getChannelData(0);
-            for(let i=0;i<data.length;i++){
-                const t = i/data.length;
-                data[i] = (Math.random()*2-1)*Math.pow(1-t,2.4)*intensity;
-            }
-            const src = ctxA.createBufferSource(); src.buffer=buffer;
-            const gain = ctxA.createGain(); gain.gain.value=0.6*intensity;
-            const bp = ctxA.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=180+intensity*180;
-            src.connect(bp).connect(gain).connect(ctxA.destination);
-            src.start();
-        }catch(e){}
+    function updateAudio(dt) {
+        if (!game.audio.ctx) return;
+        const r = game.player.speed / CONFIG.maxSpeed;
+        const now = game.audio.ctx.currentTime;
+        const engineFreq = 60 + r * 300 + (game.keys.up ? 50 : 0);
+        game.audio.osc.frequency.setTargetAtTime(engineFreq, now, 0.1);
+        game.audio.gain.gain.setTargetAtTime(0.1 + r * 0.1, now, 0.1);
+        game.audio.noiseGain.gain.setTargetAtTime(r * 0.4, now, 0.1);
     }
+
+    function playExplosionSound(intensity=1){ try{ if(!game.audio.ctx) return; const ctxA = game.audio.ctx; const buffer = ctxA.createBuffer(1, ctxA.sampleRate*0.25, ctxA.sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<data.length;i++){ const t = i/data.length; data[i] = (Math.random()*2-1)*Math.pow(1-t,2.4)*intensity; } const src = ctxA.createBufferSource(); src.buffer=buffer; const gain = ctxA.createGain(); gain.gain.value=0.6*intensity; const bp = ctxA.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=180+intensity*180; src.connect(bp).connect(gain).connect(ctxA.destination); src.start(); }catch(e){} }
+    function playTone(freq, dur, type='sine') { if(!game.audio.ctx) return; const o = game.audio.ctx.createOscillator(); o.type = type; o.frequency.value = freq; const g = game.audio.ctx.createGain(); o.connect(g).connect(game.audio.ctx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.001, game.audio.ctx.currentTime + dur); o.stop(game.audio.ctx.currentTime + dur); }
 
     init();
 </script>
