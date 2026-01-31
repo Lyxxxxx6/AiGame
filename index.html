@@ -2,10 +2,10 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>失控赛车</title>
+    <title>狂飙：延迟爆破 - 数值平衡版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap'); /* 新增科技字体 */
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
         body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: 'Orbitron', sans-serif; user-select: none; }
         #game-container { position: relative; width: 100vw; height: 100vh; overflow: hidden;}
@@ -14,13 +14,13 @@
         /* 通用 UI 层 */
         .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
-        /* ==================== 剧情化警告层 (重写) ==================== */
+        /* ==================== 剧情化警告层 ==================== */
         #warning-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 999; display: flex; flex-direction: column;
             justify-content: center; align-items: center; text-align: center;
             pointer-events: auto;
-            font-family: 'Share Tech Mono', monospace; /* 打字机/终端风格 */
+            font-family: 'Share Tech Mono', monospace;
         }
         .hazard-box {
             border: 2px solid #f00;
@@ -52,7 +52,7 @@
         }
         .confirm-btn:hover { background: #fff; color: #f00; box-shadow: 0 0 40px #f00; transform: scale(1.05); }
 
-        /* ==================== 战术指引 HUD (新增) ==================== */
+        /* ==================== 战术指引 HUD ==================== */
         #tactical-hud {
             position: absolute;
             top: 25%;
@@ -66,7 +66,7 @@
             color: #0ff;
             text-shadow: 0 0 5px #0ff;
             pointer-events: none;
-            display: none; /* 默认隐藏，开始游戏后显示 */
+            display: none;
             backdrop-filter: blur(2px);
         }
         .tac-header { font-size: 18px; color: #fff; border-bottom: 1px solid #0ff; margin-bottom: 10px; padding-bottom: 5px; font-weight: bold; }
@@ -160,7 +160,7 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 
-    <!-- 剧情化警告层 (重写) -->
+    <!-- 剧情化警告层 -->
     <div id="warning-layer">
         <div class="hazard-box">
             <div class="hazard-title">⚠ 视觉过载警告 ⚠</div>
@@ -182,7 +182,7 @@
         <div id="rush-accum-score" class="rush-val">0</div>
     </div>
 
-    <!-- 战术指引 HUD (新增) -->
+    <!-- 战术指引 HUD -->
     <div id="tactical-hud">
         <div class="tac-header">TACTICAL GUIDE // 战术手册</div>
         <div class="tac-row">
@@ -255,7 +255,7 @@
 
     <!-- 菜单 -->
     <div id="menu-layer" class="ui-layer">
-        <div class="glitch-title">失控赛车</div>
+        <div class="glitch-title">野蛮冲撞</div>
         <div class="story-text">
             系统提示：未知物体正在高速接近<br>
             开启【超级冲锋】即可逃离此地！
@@ -692,7 +692,7 @@
 
         // 模式逻辑
         if (isRush) {
-            p.rage -= dt * 25;
+            p.rage -= dt * 10;
             const rushBonus = 10000 * dt;
             p.score += rushBonus;
             p.rushScoreAccumulator += rushBonus;
@@ -772,9 +772,12 @@
             target.active = false;
             triggerBigExplosion(target.x, target.z, 0, '#0ff');
             game.player.score += 3000;
-            game.player.rage += 5;
+
+            // 修改点2：射击车辆获取的怒气值减半 (5 -> 2.5)
+            game.player.rage += 2.5;
+
             game.player.kills++;
-            showMsg("目标摧毁", "+100");
+            showMsg("目标摧毁", "+3000");
         } else {
             knockbackObject(target);
             const seg = findSegment(bullet.z);
@@ -801,10 +804,13 @@
         } else {
             if (type === 'car') {
                 game.renderer.flash = 0.8;
-                game.player.rage += 20;
+
+                // 修改点1：撞击车辆获取的怒气值减半 (20 -> 10)
+                game.player.rage += 10;
+
                 game.player.score += 5000;
                 game.player.kills++;
-                showMsg("野蛮冲撞", "+3000");
+                showMsg("野蛮冲撞", "+5000");
                 game.player.speed -= 2000;
                 if(game.player.speed < 0) game.player.speed = 0;
             } else {
