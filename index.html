@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>失控赛车：不刹车 | Unstoppable</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #050510;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Layers */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        }
+
+        /* HUD */
+        #hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            color: #0ff;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        #speed-meter {
+            color: #f0f;
+            font-size: 60px;
+            font-weight: 900;
+            text-align: center;
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-shadow: 4px 4px 0px rgba(0,0,0,0.5), 0 0 20px #f0f;
+        }
+
+        #fever-bar-container {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #fff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #fever-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #f00, #ff0, #0f0, #0ff);
+            box-shadow: 0 0 20px #fff;
+            transition: width 0.1s;
+        }
+
+        .fever-active #fever-fill {
+            animation: rainbow 0.5s infinite linear;
+        }
+
+        @keyframes rainbow {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        /* Notifications */
+        #center-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 80px;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: #fff;
+            display: none;
+            z-index: 10;
+        }
+
+        .pop-text {
+            animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes pop {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
+
+        /* Debug Panel */
+        #debug-panel {
+            position: absolute;
+            top: 100px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #f00;
+            color: #f00;
+            font-family: monospace;
+            font-size: 12px;
+            pointer-events: auto;
+            display: none; /* Hidden by default, toggleable */
+        }
+        #debug-panel h3 { margin: 0 0 10px 0; border-bottom: 1px solid #f00; }
+        .slider-row { display: flex; align-items: center; margin-bottom: 5px; }
+        .slider-row label { width: 100px; }
+        .slider-row input { flex: 1; }
+
+        /* Screens */
+        #start-screen, #game-over-screen {
+            background: rgba(0,0,0,0.85);
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        button {
+            background: transparent;
+            border: 4px solid #0ff;
+            color: #0ff;
+            padding: 15px 40px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: 0.2s;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px #0ff;
+        }
+
+        button:hover {
+            background: #0ff;
+            color: #000;
+            transform: scale(1.1);
+        }
+
+        .danger-text { color: #f00; text-shadow: 0 0 10px #f00; }
+        .score-big { font-size: 60px; color: #ff0; margin: 10px 0; }
+        
+        #error-console {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100px;
+            background: rgba(50, 0, 0, 0.9);
+            color: #ffaaaa;
+            overflow-y: scroll;
+            font-family: monospace;
+            display: none;
+            padding: 10px;
+            border-top: 2px solid red;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="hud" class="ui-layer" style="display: none;">
+        <div id="hud-top">
+            <div class="stat-box">SCORE<div id="score-val" class="stat-value">0</div></div>
+            <div class="stat-box">DISTANCE<div id="dist-val" class="stat-value">0</div></div>
+            <div class="stat-box">KILLS<div id="kill-val" class="stat-value" style="color:#f00">0</div></div>
+        </div>
+        <div id="speed-meter">0 <span style="font-size:20px">KM/H</span></div>
+        <div id="center-msg"></div>
+        <div id="fever-bar-container"><div id="fever-fill"></div></div>
+    </div>
+
+    <div id="start-screen" class="ui-layer">
+        <h1 style="font-size: 60px; color: #fff; margin-bottom: 0;">NO BRAKES</h1>
+        <h2 style="color: #f00; margin-top: 0;">失控赛车：不刹车</h2>
+        <div style="text-align: center; margin: 20px; color: #aaa;">
+            [⬅] 左转 | [➡] 右转<br>
+            侧面撞击车辆 = 击杀加速<br>
+            无刹车 · 速度无限 · 结局必死
+        </div>
+        <button onclick="startGame()">启动引擎</button>
+        <div style="margin-top:20px; font-size: 12px; cursor: pointer; text-decoration: underline;" onclick="document.getElementById('debug-panel').style.display='block'">开发者参数设置</div>
+    </div>
+
+    <div id="game-over-screen" class="ui-layer" style="display: none;">
+        <h1 class="danger-text" style="font-size: 80px;">WASTED</h1>
+        <div>最终得分</div>
+        <div id="final-score" class="score-big">0</div>
+        <div style="display: flex; gap: 20px; font-size: 18px;">
+            <div>最高时速: <span id="final-speed" style="color:#0ff">0</span></div>
+            <div>击杀数: <span id="final-kills" style="color:#f00">0</span></div>
+        </div>
+        <button onclick="resetGame()">再来一局</button>
+    </div>
+
+    <div id="debug-panel">
+        <h3>系统内核参数</h3>
+        <div class="slider-row"><label>车流密度</label><input type="range" id="p-traffic" min="0" max="100" value="30"></div>
+        <div class="slider-row"><label>障碍密度</label><input type="range" id="p-obstacles" min="0" max="100" value="20"></div>
+        <div class="slider-row"><label>初始速度</label><input type="range" id="p-speed" min="1000" max="5000" value="2000"></div>
+        <div class="slider-row"><label>赛道弯曲度</label><input type="range" id="p-curve" min="0" max="100" value="50"></div>
+        <button onclick="document.getElementById('debug-panel').style.display='none'" style="font-size: 12px; padding: 5px;">关闭</button>
+    </div>
+    
+    <div id="error-console"></div>
+</div>
+
+<script>
+/**
+ * 核心引擎：UNSTOPPABLE
+ * 基于伪3D (Pseudo-3D) 赛车逻辑
+ * 纯手写，无库
+ */
+
+// --- 全局错误捕捉 ---
+window.onerror = function(msg, url, line) {
+    const consoleDiv = document.getElementById('error-console');
+    consoleDiv.style.display = 'block';
+    consoleDiv.innerHTML += `[ERROR] ${msg} (Line ${line})<br>`;
+    return false;
+};
+
+// --- 配置参数 (Tweakables) ---
+const CONFIG = {
+    segmentLength: 200, // 赛道片段长度
+    rumbleLength: 3,    // 路肩长度
+    laneWidth: 1200,    // 车道宽度
+    fieldOfView: 100,   // 视野
+    cameraHeight: 1000, // 摄像机高度
+    cameraDepth: 0.8,   // 摄像机距离
+    drawDistance: 300,  // 渲染距离(片段数)
+    fogDensity: 5,      // 迷雾密度
+    accelRate: 20,      // 自然加速度 (不刹车!)
+    maxSpeed: 12000,    // 软上限
+    offRoadDecel: -50,  // 撞草地减速
+    feverThreshold: 100 // Fever所需能量
+};
+
+// --- 游戏状态 ---
+const STATE = {
+    START: 0,
+    PLAY: 1,
+    CRASH: 2
+};
+
+let gameState = STATE.START;
+let lastTime = 0;
+let dt = 0;
+
+// --- 赛道与玩家数据 ---
+let segments = [];
+let cars = []; // 敌车
+let playerX = 0;
+let playerZ = 0; // 离起点的总距离
+let speed = 0;
+let score = 0;
+let kills = 0;
+let fever = 0;
+let isFeverMode = false;
+let feverTimer = 0;
+let nearMissCombo = 0;
+let lastNearMissTime = 0;
+
+// 输入
+const keys = { left: false, right: false };
+
+// Canvas
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // 优化性能
+let width = window.innerWidth;
+let height = window.innerHeight;
+
+// 音频上下文
+let audioCtx;
+let masterGain;
+
+// --- 初始化 ---
+function init() {
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('keydown', e => handleKey(e.key, true));
+    window.addEventListener('keyup', e => handleKey(e.key, false));
+    
+    // 调试参数绑定
+    document.getElementById('p-traffic').oninput = (e) => CONFIG.trafficDensity = e.target.value / 1000;
+    document.getElementById('p-obstacles').oninput = (e) => CONFIG.obstacleDensity = e.target.value / 1000;
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    width = canvas.width;
+    height = canvas.height;
+}
+
+function handleKey(key, pressed) {
+    if (key === 'ArrowLeft') keys.left = pressed;
+    if (key === 'ArrowRight') keys.right = pressed;
+}
+
+// --- 音频系统 (Web Audio API) ---
+const AudioSys = {
+    inited: false,
+    engineOsc: null,
+    engineGain: null,
+    
+    init: function() {
+        if (this.inited) return;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.5;
+            masterGain.connect(audioCtx.destination);
+            
+            // 引擎音效 (锯齿波 + 低通滤波)
+            this.engineOsc = audioCtx.createOscillator();
+            this.engineOsc.type = 'sawtooth';
+            this.engineGain = audioCtx.createGain();
+            this.engineGain.gain.value = 0;
+            
+            // 滤波器模拟消声器
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 400;
+            
+            this.engineOsc.connect(filter);
+            filter.connect(this.engineGain);
+            this.engineGain.connect(masterGain);
+            this.engineOsc.start();
+            
+            this.inited = true;
+        } catch(e) { console.error("Audio Init Failed", e); }
+    },
+    
+    updateEngine: function(currentSpeed, maxSpeed) {
+        if (!this.inited) return;
+        const ratio = currentSpeed / maxSpeed;
+        // 音高随速度提升，加入随机抖动模拟震动
+        const pitch = 50 + (ratio * 400) + (Math.random() * 10);
+        this.engineOsc.frequency.setTargetAtTime(pitch, audioCtx.currentTime, 0.1);
+        
+        // 音量
+        const vol = 0.1 + (ratio * 0.2);
+        this.engineGain.gain.setTargetAtTime(gameState === STATE.PLAY ? vol : 0, audioCtx.currentTime, 0.1);
+    },
+    
+    playSfx: function(type) {
+        if (!this.inited) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(masterGain);
+        
+        const now = audioCtx.currentTime;
+        
+        if (type === 'crash') {
+            // 噪声模拟
+            osc.type = 'square'; // 简化，用方波模拟刺耳声
+            osc.frequency.setValueAtTime(100, now);
+            osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+            gain.gain.setValueAtTime(1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+            osc.start(now);
+            osc.stop(now + 0.5);
+        } else if (type === 'kill') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.linearRampToValueAtTime(800, now + 0.1);
+            gain.gain.setValueAtTime(0.5, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.2);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        } else if (type === 'nearMiss') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        }
+    }
+};
+
+// --- 赛道生成 ---
+function resetGame() {
+    segments = [];
+    cars = [];
+    playerX = 0;
+    playerZ = 0;
+    speed = parseInt(document.getElementById('p-speed').value); // 初始高速
+    score = 0;
+    kills = 0;
+    fever = 0;
+    isFeverMode = false;
+    
+    // 生成初始赛道
+    for (let i = 0; i < 500; i++) addSegment(i);
+    
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
+    
+    AudioSys.init();
+    gameState = STATE.PLAY;
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+    
+    showMsg("GO!!", 1000);
+}
+
+function addSegment(index) {
+    const curvePower = parseInt(document.getElementById('p-curve').value);
+    const trafficRate = parseInt(document.getElementById('p-traffic').value) / 1000;
+    const obstacleRate = parseInt(document.getElementById('p-obstacles').value) / 1000;
+
+    const curve = (Math.floor(index / 100) % 2) ? 
+                  ((index % 100) > 50 ? curvePower/20 : -curvePower/20) : 0;
+    
+    const y = Math.sin(index / 30) * 500; // 起伏
+
+    let sprites = [];
+    
+    // 生成障碍 (简单的矩形逻辑)
+    if (index > 50 && Math.random() < obstacleRate) {
+        sprites.push({ type: 'rock', offset: Math.random() * 2 - 1 });
+    }
+
+    // 生成敌车
+    if (index > 50 && Math.random() < trafficRate) {
+        cars.push({
+            z: index * CONFIG.segmentLength,
+            offset: Math.random() * 1.6 - 0.8,
+            speed: 3000 + Math.random() * 2000 // 敌车速度
+        });
+    }
+
+    segments.push({
+        index: index,
+        p1: { world: { y: 0, z: index * CONFIG.segmentLength }, camera: {}, screen: {} },
+        p2: { world: { y: 0, z: (index + 1) * CONFIG.segmentLength }, camera: {}, screen: {} },
+        curve: curve,
+        y: y,
+        sprites: sprites,
+        color: Math.floor(index / CONFIG.rumbleLength) % 2 ? { road: '#222', grass: '#111', rumble: '#f00' } : { road: '#202020', grass: '#0a0a0a', rumble: '#fff' }
+    });
+}
+
+// --- 核心数学：3D 投影 ---
+function project(p, cameraX, cameraY, cameraZ, cameraDepth) {
+    p.camera.x = (p.world.x || 0) - cameraX;
+    p.camera.y = (p.world.y || 0) - cameraY;
+    p.camera.z = (p.world.z || 0) - cameraZ;
+    
+    // 避免除以零
+    if (p.camera.z === 0) p.camera.z = 1;
+    
+    p.screen.scale = cameraDepth / p.camera.z;
+    p.screen.x = Math.round((width / 2) + (p.screen.scale * p.camera.x * width / 2));
+    p.screen.y = Math.round((height / 2) - (p.screen.scale * p.camera.y * height / 2));
+    p.screen.w = Math.round((p.screen.scale * CONFIG.laneWidth * width / 2));
+}
+
+// --- 游戏循环 ---
+function gameLoop(time) {
+    if (gameState !== STATE.PLAY && gameState !== STATE.CRASH) return;
+    
+    // 修复：第一次运行时 time 可能小于 lastTime，导致 dt 为负数
+    if (!lastTime) lastTime = time;
+    
+    let delta = (time - lastTime) / 1000;
+    // 修复：防止负数时间或过大的时间跳跃
+    dt = Math.max(0, Math.min(1, delta)); 
+    
+    lastTime = time;
+
+    update(dt);
+    render();
+    
+    if (gameState === STATE.PLAY) {
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+// --- 逻辑更新 ---
+function update(dt) {
+    // 1. 无尽赛道生成
+    const currentSegmentIndex = Math.floor(playerZ / CONFIG.segmentLength);
+    while (segments.length < currentSegmentIndex + CONFIG.drawDistance) {
+        addSegment(segments.length);
+    }
+
+    // 2. 速度逻辑 (永不刹车)
+    if (gameState === STATE.PLAY) {
+        // Fever模式：极速突破
+        let targetSpeed = isFeverMode ? CONFIG.maxSpeed * 1.5 : CONFIG.maxSpeed;
+        speed += CONFIG.accelRate; 
+        if (speed > targetSpeed) speed = targetSpeed;
+    } else {
+        // 死亡减速
+        speed *= 0.9;
+    }
+
+    // 3. 移动逻辑
+    playerZ += speed * dt;
+
+    // 添加这一行：防止倒车导致索引变成 -1
+    if (playerZ < 0) playerZ = 0;
+    
+    // 左右移动
+    let dx = dt * 2 * (speed / CONFIG.maxSpeed);
+    if (keys.left) playerX -= dx;
+    if (keys.right) playerX += dx;
+    
+    // 离心力
+    const playerSegment = segments[currentSegmentIndex % segments.length];
+    playerX -= (dx * playerSpeedRatio() * playerSegment.curve * 2);
+
+    // 限制在路内 (如果出界减速，但不会死，只是震动)
+    if ((playerX < -1 || playerX > 1) && !isFeverMode) {
+        speed += CONFIG.offRoadDecel;
+        if (Math.random() > 0.5) screenShake(5);
+    }
+    
+    // 限制X范围
+    playerX = Math.max(-2, Math.min(2, playerX));
+
+    // 4. 敌车更新
+    for (let i = 0; i < cars.length; i++) {
+        let car = cars[i];
+        car.z += car.speed * dt;
+        
+        // 碰撞检测
+        if (car.z > playerZ - CONFIG.segmentLength && car.z < playerZ + CONFIG.segmentLength) {
+            let overlap = 0.6; // 宽度判定
+            if (playerX > car.offset - overlap && playerX < car.offset + overlap) {
+                handleCollision(car);
+            } else if (playerX > car.offset - overlap - 0.5 && playerX < car.offset + overlap + 0.5) {
+                // Near Miss
+                if (Date.now() - lastNearMissTime > 500) {
+                    handleNearMiss();
+                }
+            }
+        }
+    }
+
+    // 5. 障碍物碰撞
+    for(let i = 0; i < playerSegment.sprites.length; i++) {
+        let sprite = playerSegment.sprites[i];
+        // 简单判定：如果在同一个segment且x重叠
+        if (playerX > sprite.offset - 0.3 && playerX < sprite.offset + 0.3) {
+            if (isFeverMode) {
+                // Fever模式撞碎障碍
+                showMsg("SMASH!", 300);
+                score += 500;
+                screenShake(10);
+                AudioSys.playSfx('kill');
+                playerSegment.sprites.splice(i, 1); // 移除障碍
+            } else {
+                crash();
+            }
+        }
+    }
+    
+    // 6. Fever 逻辑
+    if (isFeverMode) {
+        feverTimer -= dt;
+        fever = (feverTimer / 5) * 100; // 5秒持续
+        if (feverTimer <= 0) {
+            isFeverMode = false;
+            fever = 0;
+            // 恢复音效 pitch
+        }
+    } else {
+        fever = Math.max(0, fever - dt * 2); // 缓慢衰减
+    }
+    
+    // 更新 UI 数据
+    score += Math.floor(speed * dt * 0.1);
+    document.getElementById('score-val').innerText = Math.floor(score);
+    document.getElementById('dist-val').innerText = Math.floor(playerZ / 100);
+    document.getElementById('speed-meter').innerHTML = Math.floor(speed / 30) + ' <span style="font-size:20px">KM/H</span>';
+    document.getElementById('fever-fill').style.width = fever + '%';
+    
+    if (isFeverMode) document.body.classList.add('fever-active');
+    else document.body.classList.remove('fever-active');
+
+    // 更新音频
+    AudioSys.updateEngine(speed, CONFIG.maxSpeed);
+}
+
+function handleCollision(car) {
+    if (isFeverMode) {
+        killCar(car, "OBLITERATED");
+        return;
+    }
+
+    // 相对速度
+    let relSpeed = speed - car.speed;
+    let xDiff = Math.abs(playerX - car.offset);
+
+    // 核心玩法：侧面撞击 (Side Swipe)
+    // 如果重叠不是非常严重 (边缘)
+    if (xDiff > 0.4) {
+        // 成功击杀 (Takedown)
+        killCar(car, "TAKEDOWN");
+        // 给予反冲力
+        playerX += (playerX > car.offset) ? 0.3 : -0.3;
+        screenShake(10);
+    } else {
+        // 追尾 (Rear End) -> 死亡
+        crash();
+    }
+}
+
+function killCar(car, msg) {
+    car.speed = 0; // 停下（在视觉上会迅速后退）
+    car.offset += 5; // 飞出去
+    score += 1000;
+    kills++;
+    document.getElementById('kill-val').innerText = kills;
+    showMsg(msg, 500);
+    AudioSys.playSfx('kill');
+    addFever(20);
+    speed += 500; // 击杀加速
+}
+
+function handleNearMiss() {
+    lastNearMissTime = Date.now();
+    showMsg("NEAR MISS", 300);
+    score += 200;
+    addFever(10);
+    AudioSys.playSfx('nearMiss');
+}
+
+function addFever(amount) {
+    if (isFeverMode) return;
+    fever += amount;
+    if (fever >= CONFIG.feverThreshold) {
+        fever = 100;
+        startFeverMode();
+    }
+}
+
+function startFeverMode() {
+    isFeverMode = true;
+    feverTimer = 5; // 5秒真男人
+    showMsg("FEVER MODE!!!", 1000);
+    speed += 2000;
+}
+
+function crash() {
+    gameState = STATE.CRASH;
+    AudioSys.playSfx('crash');
+    screenShake(50);
+    
+    // 视觉冻结效果
+    setTimeout(() => {
+        document.getElementById('final-score').innerText = Math.floor(score);
+        document.getElementById('final-speed').innerText = Math.floor(speed/30);
+        document.getElementById('final-kills').innerText = kills;
+        document.getElementById('game-over-screen').style.display = 'flex';
+        document.getElementById('hud').style.display = 'none';
+    }, 1000);
+}
+
+function startGame() {
+    init(); // 绑定事件
+    resetGame();
+}
+
+// --- 渲染系统 ---
+function render() {
+    // 清空画布
+    ctx.clearRect(0, 0, width, height);
+
+    // 渲染背景
+    ctx.fillStyle = isFeverMode ? '#200' : '#050510';
+    ctx.fillRect(0, 0, width, height);
+    
+    // 渲染远景
+    ctx.fillStyle = isFeverMode ? '#f00' : '#112';
+    ctx.fillRect(0, height/2 - 100, width, 100);
+
+    // 修复：确保 baseSegment 存在
+    let baseIndex = Math.floor(playerZ / CONFIG.segmentLength);
+    const baseSegment = segments[baseIndex % segments.length];
+    
+    // 如果还没生成好赛道（极端情况），直接跳过渲染
+    if (!baseSegment) return;
+
+    const basePercent = (playerZ % CONFIG.segmentLength) / CONFIG.segmentLength;
+    
+    let maxy = height;
+    let x = 0;
+    let dx = -(baseSegment.curve * basePercent);
+
+    // 渲染赛道 
+    for(let n = 0; n < CONFIG.drawDistance; n++) {
+        // 修复：防止索引越界
+        let loopedIndex = baseIndex + n;
+        let segment = segments[loopedIndex % segments.length];
+
+        // ---【核心修复代码】---
+        // 如果 segment 不存在（例如负数索引或数组未填充），跳过本轮循环，防止报错
+        if (!segment) continue; 
+        // -------------------
+
+        segment.world = { 
+            x: 0, 
+            y: segment.y,
+            z: loopedIndex * CONFIG.segmentLength 
+        };
+
+        // 摄像机跟随
+        project(segment.p1, (playerX * CONFIG.laneWidth) - x, CONFIG.cameraHeight, playerZ, CONFIG.cameraDepth);
+        project(segment.p2, (playerX * CONFIG.laneWidth) - x - dx, CONFIG.cameraHeight, playerZ, CONFIG.cameraDepth);
+
+        x += dx;
+        dx += segment.curve; // 报错行现在安全了
+
+        if (segment.p1.camera.z <= CONFIG.cameraDepth || segment.p2.screen.y >= maxy || segment.p2.screen.y >= segment.p1.screen.y) continue;
+
+        renderSegment(segment);
+        maxy = segment.p1.screen.y;
+    }
+
+    // 渲染物体 (从后往前)
+    for(let n = CONFIG.drawDistance - 1; n > 0; n--) {
+        let segmentIndex = (Math.floor(playerZ / CONFIG.segmentLength) + n);
+        let segment = segments[segmentIndex % segments.length];
+        
+        // 同样的安全检查
+        if (!segment) continue;
+        
+        // 绘制敌车
+        cars.forEach(car => {
+            if (car.z >= segment.p1.world.z && car.z < segment.p2.world.z) {
+                let spriteScale = segment.p1.screen.scale;
+                let spriteX = segment.p1.screen.x + (spriteScale * car.offset * CONFIG.laneWidth * width / 2);
+                let spriteY = segment.p1.screen.y;
+                renderCar(spriteX, spriteY, spriteScale, car);
+            }
+        });
+
+        // 绘制障碍
+        segment.sprites.forEach(sprite => {
+             let spriteScale = segment.p1.screen.scale;
+             let spriteX = segment.p1.screen.x + (spriteScale * sprite.offset * CONFIG.laneWidth * width / 2);
+             let spriteY = segment.p1.screen.y;
+             renderObstacle(spriteX, spriteY, spriteScale, sprite);
+        });
+    }
+
+    renderPlayer();
+    
+    // 特效层
+    if (isFeverMode) {
+        ctx.globalCompositeOperation = 'overlay';
+        ctx.fillStyle = `rgba(255, 0, 0, ${Math.random() * 0.2})`;
+        ctx.fillRect(0,0,width,height);
+        ctx.globalCompositeOperation = 'source-over';
+    }
+}
+
+function renderSegment(segment) {
+    let x1 = segment.p1.screen.x;
+    let y1 = segment.p1.screen.y;
+    let w1 = segment.p1.screen.w;
+    let x2 = segment.p2.screen.x;
+    let y2 = segment.p2.screen.y;
+    let w2 = segment.p2.screen.w;
+
+    let r1 = w1/10; // rumble width
+    let r2 = w2/10;
+
+    // 草地
+    ctx.fillStyle = isFeverMode ? '#300' : segment.color.grass;
+    ctx.fillRect(0, y2, width, y1 - y2);
+
+    // 路肩
+    ctx.fillStyle = isFeverMode ? '#ff0' : segment.color.rumble;
+    ctx.beginPath();
+    ctx.moveTo(x1 - w1 - r1, y1);
+    ctx.lineTo(x1 - w1, y1);
+    ctx.lineTo(x2 - w2, y2);
+    ctx.lineTo(x2 - w2 - r2, y2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x1 + w1 + r1, y1);
+    ctx.lineTo(x1 + w1, y1);
+    ctx.lineTo(x2 + w2, y2);
+    ctx.lineTo(x2 + w2 + r2, y2);
+    ctx.fill();
+
+    // 赛道
+    ctx.fillStyle = isFeverMode ? '#500' : segment.color.road;
+    ctx.beginPath();
+    ctx.moveTo(x1 - w1, y1);
+    ctx.lineTo(x1 + w1, y1);
+    ctx.lineTo(x2 + w2, y2);
+    ctx.lineTo(x2 - w2, y2);
+    ctx.fill();
+    
+    // 车道线
+    if (segment.color.rumble === '#fff') { // 只在白线路段画线
+        let lw1 = w1 * 0.02;
+        let lw2 = w2 * 0.02;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(x1 - lw1, y1, lw1*2, -(y1-y2)); // 简化
+    }
+}
+
+function renderCar(x, y, scale, car) {
+    let w = 4000 * scale;
+    let h = 2000 * scale;
+    // 简单绘制一个霓虹盒子
+    ctx.fillStyle = '#000';
+    ctx.strokeStyle = '#f00';
+    ctx.lineWidth = 2;
+    ctx.fillRect(x - w/2, y - h, w, h);
+    ctx.strokeRect(x - w/2, y - h, w, h);
+    
+    // 尾灯
+    ctx.fillStyle = '#f00';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#f00';
+    ctx.fillRect(x - w/3, y - h*0.4, w/5, h/5);
+    ctx.fillRect(x + w/3 - w/5, y - h*0.4, w/5, h/5);
+    ctx.shadowBlur = 0;
+}
+
+function renderObstacle(x, y, scale, sprite) {
+    let w = 3000 * scale;
+    let h = 3000 * scale;
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.moveTo(x, y - h);
+    ctx.lineTo(x - w/2, y);
+    ctx.lineTo(x + w/2, y);
+    ctx.fill();
+    // 描边
+    ctx.strokeStyle = '#666';
+    ctx.stroke();
+}
+
+function renderPlayer() {
+    // 屏幕震动偏移
+    let shakeX = (Math.random() - 0.5) * (speed / CONFIG.maxSpeed) * 10;
+    let shakeY = (Math.random() - 0.5) * (speed / CONFIG.maxSpeed) * 10;
+    if (gameState === STATE.CRASH) { shakeX *= 5; shakeY *= 5; }
+
+    let w = 300; // 基础宽度
+    let h = 150;
+    let x = width / 2 + shakeX;
+    let y = height - 150 + shakeY;
+
+    // 速度线 (Speed Lines)
+    if (speed > 2000) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(speed/CONFIG.maxSpeed) * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for(let i=0; i<10; i++) {
+            let sx = width/2 + (Math.random()-0.5) * width;
+            let sy = height/2 + (Math.random()-0.5) * height;
+            ctx.moveTo(sx, sy);
+            ctx.lineTo((sx - width/2) * 1.5 + width/2, (sy - height/2) * 1.5 + height/2);
+        }
+        ctx.stroke();
+    }
+
+    // 玩家车身 (赛博风格)
+    ctx.save();
+    ctx.translate(x, y);
+    
+    // 倾斜模拟 (根据左右键)
+    let tilt = (keys.left ? -0.1 : 0) + (keys.right ? 0.1 : 0);
+    ctx.rotate(tilt);
+
+    // 尾焰
+    if (gameState === STATE.PLAY) {
+        ctx.fillStyle = isFeverMode ? '#fff' : '#0ff';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#0ff';
+        let flameH = (Math.random() * 50) + (speed / 100);
+        ctx.fillRect(-80, 0, 40, flameH);
+        ctx.fillRect(40, 0, 40, flameH);
+        ctx.shadowBlur = 0;
+    }
+
+    // 车体
+    ctx.fillStyle = '#000';
+    ctx.strokeStyle = isFeverMode ? '#fff' : '#0ff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-100, 0);
+    ctx.lineTo(-90, -60);
+    ctx.lineTo(90, -60);
+    ctx.lineTo(100, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 刹车灯 (不，是推进器灯)
+    ctx.fillStyle = '#0ff';
+    ctx.fillRect(-90, -30, 180, 10);
+
+    ctx.restore();
+}
+
+function playerSpeedRatio() {
+    return speed / CONFIG.maxSpeed;
+}
+
+// --- 辅助特效 ---
+let shakeIntensity = 0;
+function screenShake(amount) {
+    // 简单实现，实际渲染时加offset
+    // 由于是 canvas 绘图，我们在 renderPlayer 里模拟了震动，
+    // 全屏震动可以通过 css transform 整个 canvas 实现，更高效
+    canvas.style.transform = `translate(${Math.random()*amount - amount/2}px, ${Math.random()*amount - amount/2}px)`;
+    setTimeout(() => canvas.style.transform = 'none', 50);
+}
+
+function showMsg(text, duration) {
+    const el = document.getElementById('center-msg');
+    el.innerText = text;
+    el.style.display = 'block';
+    el.className = 'pop-text';
+    setTimeout(() => {
+        el.style.display = 'none';
+    }, duration);
+}
+
+</script>
+</body>
+</html>
