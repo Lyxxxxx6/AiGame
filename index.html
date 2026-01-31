@@ -112,8 +112,14 @@
                 </div>
 
                 <h3 style="color: #0ff; border-bottom: 1px solid #444; padding-bottom: 10px; margin-top: 20px;">世界生成</h3>
+                <!-- 新增需求：弯道频率 -->
                 <div class="setting-item">
-                    <label class="setting-label">弯道强度 <span id="val-curve" style="color:#0f0">100%</span></label>
+                    <label class="setting-label">弯道频率 (Pacing) <span id="val-curve-freq" style="color:#fa0">60%</span></label>
+                    <input type="range" id="set-curve-freq" min="10" max="90" value="60">
+                </div>
+
+                <div class="setting-item">
+                    <label class="setting-label">弯道强度 (Intensity) <span id="val-curve" style="color:#0f0">100%</span></label>
                     <input type="range" id="set-curve" min="50" max="300" value="100">
                 </div>
                 <div class="setting-item">
@@ -155,19 +161,20 @@
         accel: 120,
         maxSpeed: 14000,
         rushSpeed: 120000,
-        centrifugal: 0.35,  // 增加离心力，强调弯道体验
-        steerSens: 3.5,     // 提高转向灵敏度以对抗弯道
+        centrifugal: 0.35,  // 增加离心力
+        steerSens: 3.5,     // 提高转向灵敏度
         colors: { sky: '#050510', roadDark: '#101015', roadLight: '#181820', grassDark: '#020205', grassLight: '#040408' }
     };
 
     // --- 用户动态设置 (可修改) ---
     const SETTINGS = {
-        hitboxScale: 0.4,       // 需求2：默认碰撞盒系数 0.4
+        hitboxScale: 0.4,       // 默认碰撞盒系数 0.4
         showHitboxes: false,    // 调试开关
         roadWidthScale: 1.0,
         buildDensity: 0.5,
-        carDensity: 0.01,       // 需求3：默认密度改为 1%
-        curveMult: 1.0          // 弯道强度系数
+        carDensity: 0.01,       // 默认密度 1%
+        curveMult: 1.0,         // 弯道强度系数
+        curveFreq: 0.6          // 弯道出现频率 (0.0 - 1.0)，默认60%
     };
 
     const STATE = { MENU: 0, COUNTDOWN: 1, PLAY: 2, RUSH: 3 };
@@ -185,7 +192,6 @@
         audio: { ctx: null, osc: null, gain: null, noise: null, noiseGain: null }
     };
 
-    // 赛道生成器状态
     let TrackGen = { sectionLeft: 0, type: 'straight', y: 0, targetY: 0, startY: 0, targetCurve: 0, curve: 0 };
 
     const canvas = document.getElementById('gameCanvas');
@@ -209,7 +215,6 @@
     }
 
     function bindUI() {
-        // 绑定 UI 控件到 SETTINGS
         const boxDebug = document.getElementById('set-hitbox-debug');
         boxDebug.onchange = function() { SETTINGS.showHitboxes = this.checked; };
 
@@ -229,6 +234,13 @@
         curveInput.oninput = function() {
             SETTINGS.curveMult = this.value / 100;
             document.getElementById('val-curve').innerText = this.value + "%";
+        };
+
+        // 新增：弯道频率绑定
+        const curveFreqInput = document.getElementById('set-curve-freq');
+        curveFreqInput.oninput = function() {
+            SETTINGS.curveFreq = this.value / 100;
+            document.getElementById('val-curve-freq').innerText = this.value + "%";
         };
 
         const trafInput = document.getElementById('set-traf');
@@ -257,7 +269,7 @@
         game.cam = { shake: 0, y: 0, fovOffset: 0, skyOffset: 0 };
         TrackGen = { sectionLeft: 0, type: 'straight', y: 0, targetY: 0, startY: 0, targetCurve: 0, curve: 0 };
 
-        extendTrack(CONFIG.drawDist + 200); // 预生成跑道
+        extendTrack(CONFIG.drawDist + 200);
 
         document.getElementById('menu-layer').style.display = 'none';
         document.getElementById('hud').style.display = 'block';
@@ -290,7 +302,7 @@
         }
     }
 
-    // --- 赛道生成逻辑 ---
+    // --- 赛道生成逻辑 (升级版) ---
     function extendTrack(count) {
         const roadEdgeNorm = (CONFIG.roadW / CONFIG.laneW);
         let buildAccumulator = 0;
@@ -300,19 +312,30 @@
                 const r = Math.random();
                 TrackGen.startY = TrackGen.y;
 
-                // 弯道生成逻辑优化：更频繁、更剧烈的弯道
-                if (r < 0.2) {
+                // 算法说明：
+                // 将 0-1 的随机空间分配给 直线、弯道、坡道
+                // 根据 SETTINGS.curveFreq 动态调整分配比例
+
+                // 剩余预算 (排除弯道后的概率)
+                const remainingBudget = 1.0 - SETTINGS.curveFreq;
+                // 将剩余预算平分给直线和坡道 (或者稍微偏向直线)
+                const straightThreshold = remainingBudget * 0.6; // 剩余的60%给直线
+                const curveThreshold = straightThreshold + SETTINGS.curveFreq;
+
+                if (r < straightThreshold) {
+                    // 生成直线
                     TrackGen.type = 'straight';
                     TrackGen.sectionLeft = 20 + Math.random() * 20;
                     TrackGen.targetCurve = 0;
                     TrackGen.targetY = TrackGen.y;
-                } else if (r < 0.8) {
+                } else if (r < curveThreshold) {
+                    // 生成弯道
                     TrackGen.type = 'curve';
                     TrackGen.sectionLeft = 50 + Math.random() * 80;
-                    // 弯道系数范围：+/- 2 到 6
                     TrackGen.targetCurve = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 4) * SETTINGS.curveMult;
                     TrackGen.targetY = TrackGen.y;
                 } else {
+                    // 生成坡道 (剩余概率)
                     TrackGen.type = 'hill';
                     TrackGen.sectionLeft = 40 + Math.random() * 60;
                     TrackGen.targetCurve = 0;
@@ -324,19 +347,10 @@
             }
             TrackGen.sectionLeft--;
 
-            // 缓动曲线变化
-            let actualCurve = TrackGen.targetCurve;
-            if (TrackGen.type === 'curve' && TrackGen.sectionLeft < 20) {
-                // 弯道过渡处理
-                // actualCurve = TrackGen.targetCurve * (TrackGen.sectionLeft/20); 
-            }
-
-            // 缓动坡度变化
             if (TrackGen.type === 'hill' && Math.abs(TrackGen.targetY - TrackGen.y) > 10) {
                 TrackGen.y += (TrackGen.targetY - TrackGen.startY) / 60;
             }
 
-            // 建筑生成
             const buildings = [];
             buildAccumulator += SETTINGS.buildDensity;
             if (buildAccumulator > 1.0 + Math.random()) {
@@ -349,14 +363,12 @@
             const i = game.segments.length + game.segmentOffsetIndex;
             const sprites = [];
 
-            // 障碍物
             if (Math.random() < SETTINGS.buildDensity * 0.05) {
                 const keys = Object.keys(OBS_STYLES);
                 const styleKey = keys[Math.floor(Math.random() * keys.length)];
                 sprites.push({ type: 'obs', style: styleKey, x: (Math.random()*2 - 1) * 0.8, size: 0.8 + Math.random()*0.4 });
             }
 
-            // 车流生成
             if (Math.random() < SETTINGS.carDensity) {
                 const keys = Object.keys(CAR_STYLES);
                 const styleKey = keys[Math.floor(Math.random() * keys.length)];
@@ -374,7 +386,7 @@
                 index: i,
                 p1: { world: { y: TrackGen.y, z: i*CONFIG.segL }, camera: {}, screen: {} },
                 p2: { world: { y: TrackGen.y, z: (i+1)*CONFIG.segL }, camera: {}, screen: {} },
-                curve: actualCurve,
+                curve: TrackGen.targetCurve, // 使用 targetCurve 简化过渡，保持节奏感
                 sprites: sprites,
                 buildings: buildings,
                 color: Math.floor(i/5)%2 ? CONFIG.colors.roadDark : CONFIG.colors.roadLight
@@ -411,7 +423,6 @@
         return game.segments[Math.max(0, Math.min(index, game.segments.length - 1))];
     }
 
-    // --- 核心物理更新 ---
     function update(dt) {
         const p = game.player;
 
@@ -421,11 +432,10 @@
 
             p.speed += CONFIG.accel * accelMult * (game.state === STATE.RUSH ? 12 : 1);
             if (p.speed > maxS) p.speed = maxS;
-            if (!game.keys.up && p.speed > 0) p.speed -= CONFIG.accel * 0.5; // 自然减速
+            if (!game.keys.up && p.speed > 0) p.speed -= CONFIG.accel * 0.5;
 
             p.z += p.speed * dt;
 
-            // 无限跑道循环逻辑
             const currentIdx = Math.floor(p.z / CONFIG.segL);
             if ((currentIdx - game.segmentOffsetIndex) > game.segments.length - 300) { extendTrack(200); }
             if ((currentIdx - game.segmentOffsetIndex) > 200) {
@@ -440,7 +450,6 @@
 
             game.cam.y = trackY + CONFIG.camH;
 
-            // 转向与离心力计算
             let speedRatio = (p.speed / CONFIG.maxSpeed);
             let steerPower = dt * (speedRatio + 0.5) * CONFIG.steerSens;
             if (game.state === STATE.RUSH) steerPower *= 1.5;
@@ -448,23 +457,14 @@
             if (game.keys.left) p.x -= steerPower;
             if (game.keys.right) p.x += steerPower;
 
-            // 核心功能1：弯道离心力 (Centrifugal Force)
-            // 如果玩家在弯道上，物理位置会被推向弯道外侧
             p.x -= (currentSeg.curve * speedRatio * CONFIG.centrifugal) * dt;
-
-            // 核心功能1：相机面向新的道路 (Camera Pan)
-            // 我们通过移动背景图的 offset 来模拟相机转向
             game.cam.skyOffset -= (currentSeg.curve * speedRatio * dt * 0.5);
 
             const currentRoadLimit = (CONFIG.roadW / CONFIG.laneW) * SETTINGS.roadWidthScale - 0.1;
 
-            // 道路边界碰撞
             if (p.x < -currentRoadLimit) { p.x = -currentRoadLimit; if(p.speed>8000) p.speed-=200; }
             if (p.x > currentRoadLimit) { p.x = currentRoadLimit; if(p.speed>8000) p.speed-=200; }
 
-            // 碰撞检测 - 车辆
-            // 需求2：碰撞检测使用 SETTINGS.hitboxScale
-            // 基础判定宽度约 0.2 (路宽归一化单位)
             const baseHitWidth = 0.2;
             const dynamicHitWidth = baseHitWidth * SETTINGS.hitboxScale;
 
@@ -472,16 +472,13 @@
                 car.z += car.speed * dt;
                 if (car.z < p.z - 2000) car.z = p.z + CONFIG.drawDist * CONFIG.segL * (0.8 + Math.random()*0.4);
 
-                // 深度判定
                 if (Math.abs(car.z - p.z) < (350 * SETTINGS.hitboxScale)) {
-                    // 宽度判定：使用系数
                     if (Math.abs(car.x - p.x) < dynamicHitWidth) {
                         handleCollision(car, 'car', currentSeg);
                     }
                 }
             });
 
-            // 碰撞检测 - 障碍物
             currentSeg.sprites.forEach((s) => {
                 if (Math.abs(p.x - s.x) < dynamicHitWidth) {
                     handleCollision(s, 'obs', currentSeg);
@@ -508,7 +505,7 @@
         game.cam.shake = isRush ? 15 : 30;
 
         target.active = false;
-        if(type === 'car') target.z = -99999; // 移出视野
+        if(type === 'car') target.z = -99999;
 
         const hitPos = screenPosFromTarget(target, segRef);
         spawnExplosion(hitPos.x, hitPos.y, 50, isRush ? '#0ff' : (type==='obs'?'#fa0':'#f00'));
@@ -563,7 +560,6 @@
         const offsetZ = wz - game.player.z;
         const currentCamD = game.cam.fovOffset || CONFIG.baseCamD;
         const temp = { world:{ y: wy, z: wz }, camera:{}, screen:{} };
-        // 简化投影用于计算爆炸点
         project(temp, (target.x||0)* laneW, offsetZ, currentCamD);
         return { x: temp.screen.x, y: temp.screen.y };
     }
@@ -578,16 +574,11 @@
 
     function showMsg(m,s,t=1000) { const el = document.getElementById('center-msg'); el.innerHTML = `<div class="msg-big">${m}</div><div class="msg-sub">${s}</div>`; el.style.display = 'block'; clearTimeout(game.msgTimer); game.msgTimer = setTimeout(()=>el.style.display='none', t); }
 
-    // --- 核心渲染管线 ---
     function render() {
-        // 清屏
         ctx.fillStyle = game.state === STATE.RUSH ? '#100' : CONFIG.colors.sky;
         ctx.fillRect(0,0,W,H);
 
-        // 绘制弯道背景视差 (模拟相机转向)
-        // 使用 skyOffset 取模，保证背景循环
         const bgOffset = (game.cam.skyOffset * W) % W;
-        // 这里简单用渐变模拟星星或城市光点移动
         ctx.save();
         ctx.fillStyle = '#FFF';
         for(let i=0; i<50; i++) {
@@ -608,7 +599,6 @@
         let maxY = H;
         const currentCamD = game.cam.fovOffset || CONFIG.baseCamD;
 
-        // 核心算法：弯道积分累加 (Curve Accumulation)
         let x = 0;
         let dx = 0;
 
@@ -620,14 +610,9 @@
             const offsetZ = (segment.index * CONFIG.segL) - game.player.z;
             if(offsetZ < 1) continue;
 
-            // 1. 累加当前片段的弯道属性到 dx (导数)
             dx += segment.curve;
-            // 2. 累加 dx 到 x (实际偏移量)
             x += dx;
 
-            // 3. 将累加的 x 偏移应用到投影中
-            // 这里的公式：WorldX - (PlayerX * RoadWidth) - CurveOffset
-            // 从而实现世界在动，玩家不动的相对视觉
             project(segment.p1, (game.player.x * CONFIG.laneW) - x, offsetZ, currentCamD);
             project(segment.p2, (game.player.x * CONFIG.laneW) - x - dx, offsetZ+CONFIG.segL, currentCamD);
 
@@ -636,7 +621,6 @@
             maxY = segment.p1.screen.y;
         }
 
-        // 从后向前绘制物体 (Painter's Algorithm)
         for(let n=CONFIG.drawDist-1; n>0; n--) {
             const idx = baseIdx + n;
             if(idx >= game.segments.length || idx < 0) continue;
@@ -664,7 +648,6 @@
     function project(p, cx, cz, fov) {
         p.camera.y = (p.world.y || 0) - game.cam.y;
         p.screen.scale = fov / cz;
-        // cx 包含了弯道偏移量
         p.screen.x = Math.round((W/2) + (p.screen.scale * (-cx) * W/2));
         p.screen.y = Math.round((H*0.5) - (p.screen.scale * p.camera.y * H/2));
         p.screen.w = Math.round(p.screen.scale * CONFIG.roadW * SETTINGS.roadWidthScale * W/2);
@@ -727,10 +710,8 @@
 
         ctx.save(); ctx.translate(sx, sy);
 
-        // 阴影
         ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-w/2 - w*0.1, 0, w*1.2, h*0.15);
 
-        // 简单的 3D 侧面 (视差)
         const parallax = (sx - W/2) / (W/2); const depth = w * 0.4;
         ctx.fillStyle = '#111';
         if (Math.abs(parallax) > 0.1) {
@@ -741,24 +722,19 @@
         }
 
         const colVar = car.colorVar > 0.5 ? '#444' : style.color; ctx.fillStyle = colVar;
-        // 车型绘制
         if (car.style === 'truck') { ctx.fillRect(-w/2, -h, w, h); ctx.fillStyle = '#000'; ctx.fillRect(-w/2+5, -h+10, w-10, h/2); }
         else if (car.style === 'racer') { ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.lineTo(w/3, -h); ctx.lineTo(-w/3, -h); ctx.fill(); }
         else { ctx.fillRect(-w/2, -h*0.6, w, h*0.6); ctx.fillRect(-w/3, -h, w*0.66, h*0.4); }
 
-        // 车灯
         ctx.shadowBlur = 10 * scale * 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00';
         if (style.lights === 'v-side') { ctx.fillRect(-w/2 + 2, -h + 10, w*0.1, h*0.8); ctx.fillRect(w/2 - w*0.1 - 2, -h + 10, w*0.1, h*0.8); }
         else if (style.lights === 'quad') { const r = h/6; ctx.beginPath(); ctx.arc(-w/3, -h/3, r, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(w/3, -h/3, r, 0, Math.PI*2); ctx.fill(); }
         else { ctx.fillRect(-w/2 + 5, -h/2, w-10, h/5); }
         ctx.shadowBlur = 0;
 
-        // 需求2：碰撞盒子调试显示 (Visual Debug)
         if (SETTINGS.showHitboxes) {
-            // 基础判定宽 + 缩放系数
             const hitW = w * 1.0 * SETTINGS.hitboxScale;
             ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
-            // 绘制绿色线框
             ctx.strokeRect(-hitW/2, -h*1.2, hitW, h*1.4);
             ctx.fillStyle = 'rgba(0,255,0,0.3)';
             ctx.fillRect(-hitW/2, -h*1.2, hitW, h*1.4);
@@ -791,7 +767,6 @@
             ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(10, -h/2); ctx.lineTo(0, 0); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
         }
 
-        // 需求2：障碍物碰撞盒子调试
         if (SETTINGS.showHitboxes) {
             const hitW = w * 1.0 * SETTINGS.hitboxScale;
             ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
@@ -825,16 +800,13 @@
             ctx.fillRect(-30, -10, 15, h); ctx.fillRect(15, -10, 15, h);
         }
 
-        // 玩家自身的碰撞盒显示
         if(SETTINGS.showHitboxes) {
             ctx.shadowBlur = 0;
             ctx.strokeStyle = '#ff0';
             ctx.lineWidth = 2;
-            // 玩家盒子
             const hitW = carW * SETTINGS.hitboxScale;
             ctx.strokeRect(-hitW/2, -carH-40, hitW, carH+40);
 
-            // 准心
             ctx.strokeStyle = '#fff';
             ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke();
@@ -842,7 +814,6 @@
         ctx.restore();
     }
 
-    // --- 音效系统 ---
     function initAudio() {
         const AC = window.AudioContext || window.webkitAudioContext;
         game.audio.ctx = new AC();
